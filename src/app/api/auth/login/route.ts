@@ -25,6 +25,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!user.ativo) {
+      return NextResponse.json(
+        { error: "Sua conta foi suspensa ou desativada pelo administrador. Entre em contato com o suporte." },
+        { status: 403 }
+      );
+    }
+
     const valid = await compare(data.senha, user.senha);
     if (!valid) {
       return NextResponse.json(

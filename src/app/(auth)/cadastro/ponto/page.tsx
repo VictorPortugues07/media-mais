@@ -161,8 +161,16 @@ export default function CadastroPontoPage() {
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm shadow-slate-900/5 border border-slate-200/80">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-medium text-red-700">
-                {error}
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-medium text-red-700 flex flex-col gap-1">
+                <span>{error}</span>
+                {error.includes("Email ja cadastrado") && (
+                  <Link
+                    href="/login"
+                    className="text-blue-700 font-bold underline hover:text-blue-900 mt-1"
+                  >
+                    Clique aqui para fazer login com este e-mail →
+                  </Link>
+                )}
               </div>
             )}
 

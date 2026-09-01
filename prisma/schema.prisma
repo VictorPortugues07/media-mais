@@ -39,6 +39,9 @@ enum TipoNotificacao {
   NOVO_ANUNCIO_TV
   PONTO_ATIVADO
   PONTO_DESATIVADO
+  ALERTA
+  COBRANCA
+  SISTEMA
   GERAL
 }
 
@@ -49,6 +52,7 @@ model User {
   nome      String
   whatsapp  String
   role      UserRole
+  ativo     Boolean  @default(true)
   criadoEm  DateTime @default(now()) @map("criado_em")
 
   pontoMidia    PontoMidia?
@@ -61,6 +65,7 @@ model User {
 model PontoMidia {
   id                   Int         @id @default(autoincrement())
   userId               Int         @unique @map("user_id")
+  codigoTv             String?     @unique @map("codigo_tv")
   nomeEmpresa          String      @map("nome_empresa")
   responsavel          String
   whatsapp             String
@@ -82,17 +87,21 @@ model PontoMidia {
   faixaEtariaPublico   String[]    @map("faixa_etaria_publico")
   generoPublico        String      @map("genero_publico")
   horariosPico         String?     @map("horarios_pico")
+  fotos                String[]    @default([])
   lat                  Float?
   lng                  Float?
   status               StatusPonto @default(PENDENTE)
+  ultimaAtividade      DateTime?   @map("ultima_atividade")
   criadoEm             DateTime    @default(now()) @map("criado_em")
   atualizadoEm         DateTime    @updatedAt @map("atualizado_em")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  anuncios Anuncio[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anuncios          Anuncio[]
+  registroExibicoes RegistroExibicao[]
 
   @@index([cidade])
   @@index([status])
+  @@index([codigoTv])
   @@map("pontos_midia")
 }
 
@@ -103,6 +112,8 @@ model Anunciante {
   responsavel             String
   whatsapp                String
   instagramSite           String?  @map("instagram_site")
+  logoUrl                 String?  @map("logo_url")
+  fotos                   String[] @default([])
   cep                     String
   rua                     String
   numero                  String
@@ -145,13 +156,31 @@ model Anuncio {
   criadoEm         DateTime      @default(now()) @map("criado_em")
   atualizadoEm     DateTime      @updatedAt @map("atualizado_em")
 
-  anunciante  Anunciante @relation(fields: [anuncianteId], references: [id], onDelete: Cascade)
-  pontoMidia  PontoMidia @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
+  anunciante        Anunciante         @relation(fields: [anuncianteId], references: [id], onDelete: Cascade)
+  pontoMidia        PontoMidia         @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
+  registroExibicoes RegistroExibicao[]
 
   @@index([status])
   @@index([pontoMidiaId])
   @@index([anuncianteId])
   @@map("anuncios")
+}
+
+model RegistroExibicao {
+  id              Int       @id @default(autoincrement())
+  anuncioId       Int       @map("anuncio_id")
+  pontoMidiaId    Int       @map("ponto_midia_id")
+  duracaoSegundos Int       @default(10) @map("duracao_segundos")
+  tipoMidia       TipoMidia @map("tipo_midia")
+  exibidoEm       DateTime  @default(now()) @map("exibido_em")
+
+  anuncio    Anuncio    @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  pontoMidia PontoMidia @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
+
+  @@index([anuncioId])
+  @@index([pontoMidiaId])
+  @@index([exibidoEm])
+  @@map("registros_exibicao")
 }
 
 model Notificacao {

@@ -56,8 +56,7 @@ export default function AdminPontosPage() {
     loadPontos();
   }, []);
 
-  const handleToggleStatus = async (id: number, currentStatus: string) => {
-    const nextStatus = currentStatus === "ATIVO" ? "INATIVO" : "ATIVO";
+  const handleUpdateStatus = async (id: number, nextStatus: "PENDENTE" | "ATIVO" | "INATIVO") => {
     try {
       const res = await fetch(`/api/pontos/${id}`, {
         method: "PATCH",
@@ -66,11 +65,11 @@ export default function AdminPontosPage() {
       });
       if (res.ok) {
         setPontos((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: nextStatus as any } : p))
+          prev.map((p) => (p.id === id ? { ...p, status: nextStatus } : p))
         );
       }
     } catch (err) {
-      console.error("Toggle error:", err);
+      console.error("Update status error:", err);
     }
   };
 
@@ -131,13 +130,36 @@ export default function AdminPontosPage() {
                       Abrir TV 📺
                     </Button>
                   </Link>
-                  <Button
-                    variant={ponto.status === "ATIVO" ? "ghost" : "success"}
-                    size="sm"
-                    onClick={() => handleToggleStatus(ponto.id, ponto.status)}
-                  >
-                    {ponto.status === "ATIVO" ? "Desativar" : "Ativar no Mapa"}
-                  </Button>
+
+                  {ponto.status === "PENDENTE" && (
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={() => handleUpdateStatus(ponto.id, "ATIVO")}
+                    >
+                      Aprovar Ponto ✓
+                    </Button>
+                  )}
+
+                  {ponto.status === "ATIVO" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUpdateStatus(ponto.id, "INATIVO")}
+                    >
+                      Desativar
+                    </Button>
+                  )}
+
+                  {ponto.status === "INATIVO" && (
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={() => handleUpdateStatus(ponto.id, "ATIVO")}
+                    >
+                      Reativar
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

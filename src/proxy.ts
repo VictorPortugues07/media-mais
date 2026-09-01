@@ -6,8 +6,8 @@ const SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET || "mediamais_plataforma_secret_2026"
 );
 
-const PUBLIC_ROUTES = ["/", "/login", "/cadastro"];
-const TV_ROUTES = /^\/tv\//;
+const PUBLIC_ROUTES = ["/", "/login", "/cadastro", "/player"];
+const TV_ROUTES = /^\/(tv\/|player)/;
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -85,15 +85,25 @@ export async function POST(request: NextRequest) {
       // Ignore geocode errors if Nominatim fails or times out
     }
 
-    const ponto = await prisma.pontoMidia.create({
-      data: {
-        ...data,
-        userId: session.userId,
-        lat: geo?.lat ?? null,
-        lng: geo?.lng ?? null,
-        status: "ATIVO",
-      },
-    });
+  // Gerar código único de 6 dígitos para o novo ponto
+  let codigoTv = "";
+  let isUnique = false;
+  while (!isUnique) {
+    codigoTv = Math.floor(100000 + Math.random() * 900000).toString();
+    const exists = await prisma.pontoMidia.findFirst({ where: { codigoTv } });
+    if (!exists) isUnique = true;
+  }
+
+  const ponto = await prisma.pontoMidia.create({
+    data: {
+      ...data,
+      userId: session.userId,
+      codigoTv,
+      lat: geo?.lat ?? null,
+      lng: geo?.lng ?? null,
+      status: "ATIVO",
+    },
+  });
 
     return Response.json({ ponto }, { status: 201 });
   } catch (error) {

@@ -15,14 +15,31 @@ export async function GET() {
       nome: true,
       whatsapp: true,
       role: true,
+      ativo: true,
       criadoEm: true,
-      pontoMidia: { select: { id: true, nomeEmpresa: true, status: true } },
-      anunciante: { select: { id: true, nomeEmpresa: true } },
+      pontoMidia: {
+        select: {
+          id: true,
+          nomeEmpresa: true,
+          status: true,
+          codigoTv: true,
+          fotos: true,
+          ultimaAtividade: true,
+        },
+      },
+      anunciante: {
+        select: {
+          id: true,
+          nomeEmpresa: true,
+          logoUrl: true,
+          fotos: true,
+        },
+      },
     },
   });
 
-  if (!user) {
-    return Response.json({ user: null }, { status: 401 });
+  if (!user || !user.ativo) {
+    return Response.json({ user: null, error: "Usuário inativo" }, { status: 401 });
   }
 
   return Response.json({ user });

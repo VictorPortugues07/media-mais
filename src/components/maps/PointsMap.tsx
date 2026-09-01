@@ -15,6 +15,7 @@ export interface PontoMapItem {
   fluxoDiarioEstimado: string;
   tempoPermanencia: string;
   faixaEtariaPublico: string[];
+  fotos?: string[];
   lat?: number | null;
   lng?: number | null;
   _count?: {

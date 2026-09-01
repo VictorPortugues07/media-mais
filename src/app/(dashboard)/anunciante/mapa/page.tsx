@@ -109,6 +109,29 @@ export default function AnuncianteMapaPage() {
                 </div>
               </CardHeader>
               <CardBody className="space-y-4">
+                {/* Galeria de Fotos do Estabelecimento */}
+                {selectedPonto.fotos && selectedPonto.fotos.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-slate-700 mb-2">
+                      Fotos do Espaço & TV:
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedPonto.fotos.map((foto, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-xl overflow-hidden aspect-video border border-slate-200 bg-slate-900 shadow-xs"
+                        >
+                          <img
+                            src={foto}
+                            alt={`Espaço ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <p className="text-[10px] uppercase font-bold text-slate-400">
