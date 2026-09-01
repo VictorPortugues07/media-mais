@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  PONTO
+  ANUNCIANTE
+  ADMIN
+}
+
+enum StatusPonto {
+  PENDENTE
+  ATIVO
+  INATIVO
+}
+
+enum StatusAnuncio {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  ATIVO
+  PAUSADO
+  EXPIRADO
+}
+
+enum TipoMidia {
+  VIDEO
+  IMAGEM
+}
+
+enum TipoNotificacao {
+  ANUNCIO_PENDENTE
+  ANUNCIO_APROVADO
+  ANUNCIO_REJEITADO
+  NOVO_ANUNCIO_TV
+  PONTO_ATIVADO
+  PONTO_DESATIVADO
+  GERAL
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  senha     String
+  nome      String
+  whatsapp  String
+  role      UserRole
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  pontoMidia    PontoMidia?
+  anunciante    Anunciante?
+  notificacoes  Notificacao[]
+
+  @@map("users")
+}
+
+model PontoMidia {
+  id                   Int         @id @default(autoincrement())
+  userId               Int         @unique @map("user_id")
+  nomeEmpresa          String      @map("nome_empresa")
+  responsavel          String
+  whatsapp             String
+  instagramSite        String?     @map("instagram_site")
+  cep                  String
+  rua                  String
+  numero               String
+  complemento          String?
+  bairro               String
+  cidade               String
+  uf                   String      @db.Char(2)
+  categoria            String
+  descricao            String
+  possuiTv             Boolean     @map("possui_tv")
+  quantidadeTvs        Int?        @map("quantidade_tvs")
+  localInstalacao      String?     @map("local_instalacao")
+  fluxoDiarioEstimado  String      @map("fluxo_diario_estimado")
+  tempoPermanencia     String      @map("tempo_permanencia")
+  faixaEtariaPublico   String[]    @map("faixa_etaria_publico")
+  generoPublico        String      @map("genero_publico")
+  horariosPico         String?     @map("horarios_pico")
+  lat                  Float?
+  lng                  Float?
+  status               StatusPonto @default(PENDENTE)
+  criadoEm             DateTime    @default(now()) @map("criado_em")
+  atualizadoEm         DateTime    @updatedAt @map("atualizado_em")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anuncios Anuncio[]
+
+  @@index([cidade])
+  @@index([status])
+  @@map("pontos_midia")
+}
+
+model Anunciante {
+  id                      Int      @id @default(autoincrement())
+  userId                  Int      @unique @map("user_id")
+  nomeEmpresa             String   @map("nome_empresa")
+  responsavel             String
+  whatsapp                String
+  instagramSite           String?  @map("instagram_site")
+  cep                     String
+  rua                     String
+  numero                  String
+  complemento             String?
+  bairro                  String
+  cidade                  String
+  uf                      String   @db.Char(2)
+  categoria               String
+  oQueAnunciar            String   @map("o_que_anunciar")
+  descricaoAnuncio        String   @map("descricao_anuncio")
+  preferenciaLocalizacao  String   @map("preferencia_localizacao")
+  distanciaMaxima         String?  @map("distancia_maxima")
+  bairrosEspecificos      String?  @map("bairros_especificos")
+  categoriasEspecificas   String[] @map("categorias_especificas")
+  faixaEtariaAlvo         String[] @map("faixa_etaria_alvo")
+  generoAlvo              String   @map("genero_alvo")
+  criadoEm                DateTime @default(now()) @map("criado_em")
+  atualizadoEm            DateTime @updatedAt @map("atualizado_em")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anuncios Anuncio[]
+
+  @@index([cidade])
+  @@map("anunciantes")
+}
+
+model Anuncio {
+  id               Int           @id @default(autoincrement())
+  anuncianteId     Int           @map("anunciante_id")
+  pontoMidiaId     Int           @map("ponto_midia_id")
+  titulo           String
+  descricao        String
+  tipoMidia        TipoMidia     @map("tipo_midia")
+  midiaUrl         String        @map("midia_url")
+  duracaoSegundos  Int           @default(10) @map("duracao_segundos")
+  status           StatusAnuncio @default(PENDENTE)
+  motivoRejeicao   String?       @map("motivo_rejeicao")
+  dataInicio       DateTime?     @map("data_inicio")
+  dataFim          DateTime?     @map("data_fim")
+  criadoEm         DateTime      @default(now()) @map("criado_em")
+  atualizadoEm     DateTime      @updatedAt @map("atualizado_em")
+
+  anunciante  Anunciante @relation(fields: [anuncianteId], references: [id], onDelete: Cascade)
+  pontoMidia  PontoMidia @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([pontoMidiaId])
+  @@index([anuncianteId])
+  @@map("anuncios")
+}
+
+model Notificacao {
+  id        Int              @id @default(autoincrement())
+  userId    Int              @map("user_id")
+  tipo      TipoNotificacao
+  titulo    String
+  mensagem  String
+  lida      Boolean          @default(false)
+  criadoEm  DateTime         @default(now()) @map("criado_em")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lida])
+  @@map("notificacoes")
+}

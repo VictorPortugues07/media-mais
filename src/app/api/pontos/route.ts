@@ -1,0 +1,106 @@
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { geocodeAddress } from "@/lib/geocode";
+import { z } from "zod";
+import { NextRequest } from "next/server";
+
+const pontoSchema = z.object({
+  nomeEmpresa: z.string().min(2),
+  responsavel: z.string().min(2),
+  whatsapp: z.string().min(10),
+  instagramSite: z.string().optional(),
+  cep: z.string().min(8),
+  rua: z.string().min(2),
+  numero: z.string().min(1),
+  complemento: z.string().optional(),
+  bairro: z.string().min(2),
+  cidade: z.string().min(2),
+  uf: z.string().length(2),
+  categoria: z.string().min(2),
+  descricao: z.string().min(10),
+  possuiTv: z.boolean(),
+  quantidadeTvs: z.number().optional(),
+  localInstalacao: z.string().optional(),
+  fluxoDiarioEstimado: z.string().min(1),
+  tempoPermanencia: z.string().min(1),
+  faixaEtariaPublico: z.array(z.string()),
+  generoPublico: z.string().min(1),
+  horariosPico: z.string().optional(),
+});
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+  const cidade = searchParams.get("cidade");
+  const categoria = searchParams.get("categoria");
+  const status = searchParams.get("status");
+
+  const where: Record<string, unknown> = {};
+  if (cidade) where.cidade = { contains: cidade, mode: "insensitive" };
+  if (categoria) where.categoria = categoria;
+  if (status) where.status = status;
+  else where.status = "ATIVO";
+
+  const pontos = await prisma.pontoMidia.findMany({
+    where,
+    include: {
+      user: { select: { nome: true, email: true } },
+      _count: { select: { anuncios: { where: { status: "ATIVO" } } } },
+    },
+    orderBy: { criadoEm: "desc" },
+  });
+
+  return Response.json({ pontos });
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== "PONTO") {
+      return Response.json({ error: "Nao autorizado" }, { status: 401 });
+    }
+
+    const existing = await prisma.pontoMidia.findUnique({
+      where: { userId: session.userId },
+    });
+    if (existing) {
+      return Response.json(
+        { error: "Voce ja possui um ponto de midia cadastrado" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const data = pontoSchema.parse(body);
+
+    let geo = null;
+    try {
+      geo = await geocodeAddress(
+        data.rua,
+        data.numero,
+        data.bairro,
+        data.cidade,
+        data.uf
+      );
+    } catch {
+      // Ignore geocode errors if Nominatim fails or times out
+    }
+
+    const ponto = await prisma.pontoMidia.create({
+      data: {
+        ...data,
+        userId: session.userId,
+        lat: geo?.lat ?? null,
+        lng: geo?.lng ?? null,
+        status: "ATIVO",
+      },
+    });
+
+    return Response.json({ ponto }, { status: 201 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json({ error: error.issues[0].message }, { status: 400 });
+    }
+    console.error("Create ponto error:", error);
+    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
+  }
+}
