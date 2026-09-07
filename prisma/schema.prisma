@@ -51,6 +51,7 @@ model User {
   senha     String
   nome      String
   whatsapp  String
+  avatarUrl String?  @map("avatar_url")
   role      UserRole
   ativo     Boolean  @default(true)
   criadoEm  DateTime @default(now()) @map("criado_em")
@@ -87,11 +88,18 @@ model PontoMidia {
   faixaEtariaPublico   String[]    @map("faixa_etaria_publico")
   generoPublico        String      @map("genero_publico")
   horariosPico         String?     @map("horarios_pico")
+  horarioAbertura      String?     @default("08:00") @map("horario_abertura")
+  horarioFechamento    String?     @default("19:00") @map("horario_fechamento")
+  diasFuncionamento    String[]    @default(["Segunda", "Terça", "Quarta", "Quinta", "Sexta"]) @map("dias_funcionamento")
+  codigoRotativo       String?     @map("codigo_rotativo")
+  codigoRotativoExpira DateTime?   @map("codigo_rotativo_expira")
   fotos                String[]    @default([])
   lat                  Float?
   lng                  Float?
   status               StatusPonto @default(PENDENTE)
   ultimaAtividade      DateTime?   @map("ultima_atividade")
+  tipoDispositivo      String?     @map("tipo_dispositivo")
+  resolucaoTela        String?     @map("resolucao_tela")
   criadoEm             DateTime    @default(now()) @map("criado_em")
   atualizadoEm         DateTime    @updatedAt @map("atualizado_em")
 

@@ -62,6 +62,24 @@ export default function TVPlayerPage({
     return () => clearInterval(pollInterval);
   }, [pontoId]);
 
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (videoRef.current) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1;
+        videoRef.current.play().catch(() => {});
+      }
+    };
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
   const nextAd = () => {
     if (anuncios.length === 0) return;
     setCurrentIndex((prev) => (prev + 1) % anuncios.length);
@@ -174,7 +192,6 @@ export default function TVPlayerPage({
             key={currentAd.id}
             src={currentAd.midiaUrl}
             autoPlay
-            muted
             playsInline
             onEnded={nextAd}
             onError={() => {

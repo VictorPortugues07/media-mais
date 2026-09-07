@@ -11,10 +11,11 @@ export interface SidebarProps {
   role: "PONTO" | "ANUNCIANTE" | "ADMIN";
   userName: string;
   userEmail: string;
+  userAvatar?: string | null;
   pontoId?: number;
 }
 
-export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
+export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,20 +60,20 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
         ),
       },
       {
-        href: "/anunciante/perfil",
-        label: "Meu Perfil",
-        icon: (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        ),
-      },
-      {
         href: "/anunciante/notificacoes",
         label: "Notificações",
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        ),
+      },
+      {
+        href: "/anunciante/perfil",
+        label: "Usuário",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         ),
       },
@@ -97,15 +98,6 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
         ),
       },
       {
-        href: "/ponto/perfil",
-        label: "Meu Estabelecimento",
-        icon: (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        ),
-      },
-      {
         href: "/ponto/notificacoes",
         label: "Notificações",
         icon: (
@@ -115,13 +107,11 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
         ),
       },
       {
-        href: "/player",
-        label: "Abrir Player TV 📺",
-        target: "_blank",
+        href: "/ponto/perfil",
+        label: "Usuário",
         icon: (
-          <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         ),
       },
@@ -146,6 +136,15 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
         ),
       },
       {
+        href: "/admin/notificacoes",
+        label: "Notificações",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/pontos",
         label: "Pontos de TV",
         icon: (
@@ -165,10 +164,19 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
       },
       {
         href: "/admin/usuarios",
-        label: "Usuários",
+        label: "Gerenciar Usuários",
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/admin/perfil",
+        label: "Usuário",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         ),
       },
@@ -194,18 +202,18 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Topbar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#051160] z-30 px-4 flex items-center justify-between border-b border-blue-900/40">
+      {/* Mobile Topbar com fundo branco e logo destacado */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white z-30 px-4 flex items-center justify-between border-b border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-slate-300 hover:text-white"
+            className="p-2 text-slate-700 hover:text-blue-600 cursor-pointer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Logo className="h-6 w-auto" whiteText={true} />
+          <Logo className="h-6 w-auto" whiteText={false} />
         </div>
         <NotificationBell role={role} />
       </div>
@@ -278,12 +286,8 @@ export function Sidebar({ role, userName, userEmail, pontoId }: SidebarProps) {
           })}
         </nav>
 
-        {/* User Footer */}
+        {/* User Footer Minimalista */}
         <div className="p-4 border-t border-blue-900/40 bg-black/20">
-          <div className="mb-3">
-            <p className="text-xs font-bold text-white truncate">{userName}</p>
-            <p className="text-[11px] text-blue-200/70 truncate">{userEmail}</p>
-          </div>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-300 hover:bg-rose-500/15 transition border border-rose-400/20 cursor-pointer"

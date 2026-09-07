@@ -13,8 +13,9 @@ import type { PontoMapItem } from "@/components/maps/PointsMap";
 const PointsMap = dynamic(() => import("@/components/maps/PointsMap"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[500px] flex items-center justify-center bg-slate-100 rounded-2xl">
+    <div className="w-full h-[550px] flex flex-col items-center justify-center bg-slate-100 rounded-2xl gap-3">
       <Spinner size="lg" />
+      <p className="text-xs text-slate-500 font-medium">Carregando mapa…</p>
     </div>
   ),
 });
@@ -96,10 +97,21 @@ export default function AnuncianteMapaPage() {
           {selectedPonto ? (
             <Card className="shadow-md border-blue-100">
               <CardHeader className="bg-blue-50/50">
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start gap-3">
+                  {selectedPonto.fotos && selectedPonto.fotos.length > 0 ? (
+                    <img
+                      src={selectedPonto.fotos[0]}
+                      alt={selectedPonto.nomeEmpresa}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-md shrink-0">
+                      {selectedPonto.nomeEmpresa.substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
                     <Badge variant="brand">{selectedPonto.categoria}</Badge>
-                    <h3 className="text-lg font-bold text-slate-900 font-heading mt-2">
+                    <h3 className="text-lg font-bold text-slate-900 font-heading mt-1 truncate">
                       {selectedPonto.nomeEmpresa}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -109,26 +121,45 @@ export default function AnuncianteMapaPage() {
                 </div>
               </CardHeader>
               <CardBody className="space-y-4">
-                {/* Galeria de Fotos do Estabelecimento */}
-                {selectedPonto.fotos && selectedPonto.fotos.length > 0 && (
+                {/* Galeria de Fotos em Destaque Vistoso */}
+                {selectedPonto.fotos && selectedPonto.fotos.length > 0 ? (
                   <div>
                     <p className="text-xs font-bold text-slate-700 mb-2">
-                      Fotos do Espaço & TV:
+                      Fotos do Estabelecimento & Posicionamento da TV:
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {selectedPonto.fotos.map((foto, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-xl overflow-hidden aspect-video border border-slate-200 bg-slate-900 shadow-xs"
-                        >
-                          <img
-                            src={foto}
-                            alt={`Espaço ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ))}
+                    {/* Imagem Principal Grande */}
+                    <div className="rounded-2xl overflow-hidden aspect-video border border-slate-200 bg-slate-950 shadow-sm mb-2 group relative">
+                      <img
+                        src={selectedPonto.fotos[0]}
+                        alt="Foto Principal"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <span className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        Foto Principal da TV
+                      </span>
                     </div>
+
+                    {/* Miniaturas Adicionais */}
+                    {selectedPonto.fotos.length > 1 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {selectedPonto.fotos.slice(1, 4).map((foto, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl overflow-hidden aspect-video border border-slate-200 bg-slate-900 shadow-xs hover:border-blue-500 transition"
+                          >
+                            <img
+                              src={foto}
+                              alt={`Espaço ${idx + 2}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-400">
+                    Nenhuma foto cadastrada para este ponto ainda.
                   </div>
                 )}
 

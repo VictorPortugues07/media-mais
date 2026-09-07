@@ -7,6 +7,7 @@ const perfilAnuncianteSchema = z.object({
   nome: z.string().min(2),
   whatsapp: z.string().min(10),
   senha: z.string().min(6).optional().or(z.literal("")),
+  avatarUrl: z.string().optional().nullable(),
   nomeEmpresa: z.string().min(2),
   responsavel: z.string().min(2),
   instagramSite: z.string().optional().nullable(),
@@ -53,6 +54,7 @@ export async function GET() {
       nome: user.nome,
       email: user.email,
       whatsapp: user.whatsapp,
+      avatarUrl: user.avatarUrl,
     },
     anunciante: user.anunciante,
   });
@@ -81,6 +83,10 @@ export async function PUT(request: NextRequest) {
       nome: data.nome,
       whatsapp: data.whatsapp,
     };
+
+    if (data.avatarUrl !== undefined) {
+      userUpdateData.avatarUrl = data.avatarUrl;
+    }
 
     if (data.senha && data.senha.trim().length >= 6) {
       const bcrypt = await import("bcryptjs");

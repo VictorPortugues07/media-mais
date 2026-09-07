@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -44,4 +44,24 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     filename,
     type: isVideo ? "VIDEO" : "IMAGEM",
   };
+}
+
+export async function deleteUploadedFile(url: string): Promise<boolean> {
+  try {
+    if (!url || typeof url !== "string") return false;
+    const cleanUrl = url.replace(/^[/\\]+/, "");
+    if (!cleanUrl.startsWith("uploads/")) return false;
+
+    const publicUploads = path.resolve(process.cwd(), "public", "uploads");
+    const fullPath = path.resolve(process.cwd(), "public", cleanUrl);
+
+    if (!fullPath.startsWith(publicUploads)) {
+      return false;
+    }
+
+    await unlink(fullPath);
+    return true;
+  } catch {
+    return false;
+  }
 }

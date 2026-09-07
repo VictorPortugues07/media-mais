@@ -14,6 +14,7 @@ export async function GET() {
       email: true,
       nome: true,
       whatsapp: true,
+      avatarUrl: true,
       role: true,
       ativo: true,
       criadoEm: true,
@@ -43,4 +44,48 @@ export async function GET() {
   }
 
   return Response.json({ user });
+}
+
+export async function PUT(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const updateData: Record<string, unknown> = {};
+
+    if (typeof body.nome === "string" && body.nome.trim().length >= 2) {
+      updateData.nome = body.nome.trim();
+    }
+    if (typeof body.whatsapp === "string") {
+      updateData.whatsapp = body.whatsapp.trim();
+    }
+    if (typeof body.avatarUrl === "string" || body.avatarUrl === null) {
+      updateData.avatarUrl = body.avatarUrl;
+    }
+    if (typeof body.senha === "string" && body.senha.trim().length >= 6) {
+      const bcrypt = await import("bcryptjs");
+      updateData.senha = await bcrypt.hash(body.senha.trim(), 10);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: session.userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        nome: true,
+        whatsapp: true,
+        avatarUrl: true,
+        role: true,
+      },
+    });
+
+    return Response.json({ user: updated, success: true });
+  } catch (err: unknown) {
+    console.error("Erro ao atualizar usuário:", err);
+    return Response.json({ error: "Erro ao atualizar dados" }, { status: 500 });
+  }
 }

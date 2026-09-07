@@ -109,7 +109,7 @@ export function TVFrame({
               <span>Anuncie para clientes da região</span>
               <span className="w-1 h-1 rounded-full bg-blue-400" />
               <span className="font-bold text-emerald-400 flex items-center gap-1">
-                WhatsApp: (48) 8879-6514
+                WhatsApp: (48) 98879-6514
               </span>
             </p>
           </div>

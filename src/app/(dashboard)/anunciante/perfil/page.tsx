@@ -20,6 +20,7 @@ export default function AnunciantePerfilPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [form, setForm] = useState({
@@ -27,6 +28,7 @@ export default function AnunciantePerfilPage() {
     email: "",
     senha: "",
     whatsapp: "",
+    avatarUrl: "",
     nomeEmpresa: "",
     responsavel: "",
     instagramSite: "",
@@ -62,6 +64,7 @@ export default function AnunciantePerfilPage() {
             email: user.email || "",
             senha: "",
             whatsapp: formatPhone(user.whatsapp || anunciante.whatsapp || ""),
+            avatarUrl: user.avatarUrl || "",
             nomeEmpresa: anunciante.nomeEmpresa || "",
             responsavel: anunciante.responsavel || "",
             instagramSite: anunciante.instagramSite || "",
@@ -198,6 +201,40 @@ export default function AnunciantePerfilPage() {
     }));
   };
 
+  const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    setMessage(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no upload");
+
+      setForm((prev) => ({
+        ...prev,
+        avatarUrl: data.url,
+      }));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar imagem";
+      setMessage({ type: "error", text: msg });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const removeAvatar = () => {
+    setForm((prev) => ({ ...prev, avatarUrl: "" }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -238,8 +275,9 @@ export default function AnunciantePerfilPage() {
       role="ANUNCIANTE"
       userName={form.nome || "Anunciante"}
       userEmail={form.email}
-      title="Meu Perfil de Anunciante"
-      description="Edite os dados da sua marca, logotipo, fotos e preferências de campanha"
+      userAvatar={form.avatarUrl || null}
+      title="Usuário & Anunciante"
+      description="Gerencie seus dados de acesso, foto de perfil e informações da marca"
     >
       <div className="max-w-4xl">
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -255,6 +293,114 @@ export default function AnunciantePerfilPage() {
               <span>{message.text}</span>
             </div>
           )}
+
+          {/* Dados do Usuário & Foto de Perfil */}
+          <Card className="border-blue-100 shadow-sm">
+            <CardHeader className="bg-blue-50/40">
+              <h3 className="font-bold text-slate-900 font-heading">
+                Perfil do Usuário & Credenciais de Acesso
+              </h3>
+              <p className="text-xs text-slate-500">
+                Altere sua foto de perfil, dados pessoais e senha de acesso à plataforma
+              </p>
+            </CardHeader>
+            <CardBody className="space-y-6">
+              {/* Foto de Perfil */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Foto de Perfil do Usuário
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div className="relative">
+                    {form.avatarUrl ? (
+                      <img
+                        src={form.avatarUrl}
+                        alt="Foto de Perfil"
+                        className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center border-2 border-dashed border-slate-300">
+                        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 text-center sm:text-left space-y-2">
+                    <p className="text-xs font-bold text-slate-800">
+                      {form.avatarUrl ? "Foto atual configurada" : "Nenhuma foto de perfil adicionada"}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Recomendado: imagem quadrada (JPG, PNG ou WebP até 5MB)
+                    </p>
+                    <div className="flex items-center gap-2 justify-center sm:justify-start pt-1">
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUploadAvatar}
+                          disabled={uploadingAvatar}
+                          className="hidden"
+                        />
+                        {uploadingAvatar ? (
+                          <Spinner size="sm" />
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <span>{form.avatarUrl ? "Trocar Foto" : "Enviar Foto de Perfil"}</span>
+                          </>
+                        )}
+                      </label>
+
+                      {form.avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={removeAvatar}
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-red-50 hover:text-red-700 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campos de Acesso */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                <Input
+                  label="Nome do Responsável"
+                  required
+                  value={form.nome}
+                  onChange={(e) => setForm({ ...form, nome: e.target.value, responsavel: e.target.value })}
+                />
+                <Input
+                  label="WhatsApp"
+                  required
+                  value={form.whatsapp}
+                  onChange={(e) => setForm({ ...form, whatsapp: formatPhone(e.target.value) })}
+                />
+                <Input
+                  label="E-mail de Login"
+                  type="email"
+                  disabled
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  helperText="O e-mail de acesso não pode ser alterado diretamente."
+                />
+                <Input
+                  label="Nova Senha (deixe em branco para não alterar)"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={form.senha}
+                  onChange={(e) => setForm({ ...form, senha: e.target.value })}
+                />
+              </div>
+            </CardBody>
+          </Card>
 
           {/* Logotipo e Fotos da Empresa */}
           <Card>
@@ -331,44 +477,6 @@ export default function AnunciantePerfilPage() {
                     )}
                   </label>
                 </div>
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Dados de Acesso */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-bold text-slate-900 font-heading">Dados de Acesso</h3>
-              <p className="text-xs text-slate-500">Credenciais e contatos do responsável</p>
-            </CardHeader>
-            <CardBody>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Nome do Responsável"
-                  required
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value, responsavel: e.target.value })}
-                />
-                <Input
-                  label="WhatsApp"
-                  required
-                  value={form.whatsapp}
-                  onChange={(e) => setForm({ ...form, whatsapp: formatPhone(e.target.value) })}
-                />
-                <Input
-                  label="E-mail de Login"
-                  type="email"
-                  disabled
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-                <Input
-                  label="Nova Senha (deixe em branco para não alterar)"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={form.senha}
-                  onChange={(e) => setForm({ ...form, senha: e.target.value })}
-                />
               </div>
             </CardBody>
           </Card>

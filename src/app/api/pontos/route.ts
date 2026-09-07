@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   const pontos = await prisma.pontoMidia.findMany({
     where,
     include: {
-      user: { select: { nome: true, email: true } },
+      user: { select: { nome: true, email: true, avatarUrl: true } },
       _count: { select: { anuncios: { where: { status: "ATIVO" } } } },
     },
     orderBy: { criadoEm: "desc" },

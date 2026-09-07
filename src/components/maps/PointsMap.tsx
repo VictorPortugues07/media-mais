@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 export interface PontoMapItem {
@@ -18,6 +18,10 @@ export interface PontoMapItem {
   fotos?: string[];
   lat?: number | null;
   lng?: number | null;
+  user?: {
+    nome?: string;
+    avatarUrl?: string | null;
+  };
   _count?: {
     anuncios: number;
   };
@@ -39,14 +43,30 @@ export default function PointsMap({
   const mapInstanceRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([]);
+  const [isReady, setIsReady] = useState(false);
+
+  // Garante que o container está montado e tem dimensões antes de inicializar o Leaflet
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
+    if (!isReady) return;
+
     let isMounted = true;
 
     async function initMap() {
-      if (!mapContainerRef.current || mapInstanceRef.current) return;
+      if (!mapContainerRef.current) return;
+
+      // Se já existe instância, apenas invalida o tamanho (garante re-render correto)
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+        return;
+      }
 
       const L = await import("leaflet");
+      if (!isMounted || !mapContainerRef.current) return;
 
       const defaultCenter: [number, number] = [-27.5954, -48.548]; // Florianópolis
 
@@ -62,6 +82,13 @@ export default function PointsMap({
       }).addTo(map);
 
       mapInstanceRef.current = map;
+
+      // invalidateSize após tiles carregarem — corrige o bug de mapa cinza na primeira visita
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 200);
 
       updateMarkers(L, map);
     }
@@ -79,26 +106,33 @@ export default function PointsMap({
 
       validPontos.forEach((ponto) => {
         const isSelected = ponto.id === selectedPontoId;
+        const avatarImage =
+          ponto.fotos && ponto.fotos.length > 0
+            ? ponto.fotos[0]
+            : ponto.user?.avatarUrl;
 
+        const size = isSelected ? 44 : 36;
         const customIcon = L.divIcon({
           className: "custom-div-icon",
-          html: `<div style="
-            background: ${isSelected ? "linear-gradient(135deg, #1d4ed8, #2563eb)" : "#2563eb"};
-            width: ${isSelected ? "38px" : "30px"};
-            height: ${isSelected ? "38px" : "30px"};
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: ${isSelected ? "16px" : "13px"};
-            cursor: pointer;
-            transition: all 0.2s ease;
-          ">📺</div>`,
-          iconSize: [isSelected ? 38 : 30, isSelected ? 38 : 30],
-          iconAnchor: [isSelected ? 19 : 15, isSelected ? 19 : 15],
+          html: avatarImage
+            ? `<div style="
+                width:${size}px;height:${size}px;border-radius:50%;
+                border:${isSelected ? "3px solid #2563eb" : "2px solid white"};
+                box-shadow:0 4px 14px rgba(0,0,0,0.35);
+                background-image:url('${avatarImage}');
+                background-size:cover;background-position:center;
+                cursor:pointer;transition:all .2s ease;">
+              </div>`
+            : `<div style="
+                background:${isSelected ? "linear-gradient(135deg,#1d4ed8,#2563eb)" : "#2563eb"};
+                width:${isSelected ? 38 : 30}px;height:${isSelected ? 38 : 30}px;
+                border-radius:50%;border:3px solid white;
+                box-shadow:0 4px 14px rgba(37,99,235,0.4);
+                display:flex;align-items:center;justify-content:center;
+                color:white;font-size:${isSelected ? 16 : 13}px;
+                cursor:pointer;transition:all .2s ease;">📺</div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
         });
 
         const marker = L.marker([ponto.lat!, ponto.lng!], { icon: customIcon })
@@ -108,13 +142,13 @@ export default function PointsMap({
           });
 
         marker.bindPopup(`
-          <div style="font-family: var(--font-inter, sans-serif); padding: 4px;">
-            <strong style="font-size: 14px; color: #0f172a; display: block; margin-bottom: 2px;">${ponto.nomeEmpresa}</strong>
-            <span style="font-size: 11px; background: #eff6ff; color: #1d4ed8; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${ponto.categoria}</span>
-            <div style="font-size: 12px; color: #64748b; margin-top: 6px; line-height: 1.4;">
-              📍 ${ponto.bairro}, ${ponto.cidade} - ${ponto.uf}<br/>
+          <div style="font-family:sans-serif;padding:4px;min-width:180px;">
+            <strong style="font-size:14px;color:#0f172a;display:block;margin-bottom:4px;">${ponto.nomeEmpresa}</strong>
+            <span style="font-size:11px;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-weight:600;">${ponto.categoria}</span>
+            <div style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.6;">
+              📍 ${ponto.bairro}, ${ponto.cidade} – ${ponto.uf}<br/>
               👥 Fluxo: <b>${ponto.fluxoDiarioEstimado}</b><br/>
-              ⏱️ Tempo médio: <b>${ponto.tempoPermanencia}</b>
+              ⏱️ Permanência: <b>${ponto.tempoPermanencia}</b>
             </div>
           </div>
         `);
@@ -133,6 +167,7 @@ export default function PointsMap({
     } else {
       import("leaflet").then((L) => {
         if (isMounted && mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
           updateMarkers(L, mapInstanceRef.current);
         }
       });
@@ -141,11 +176,21 @@ export default function PointsMap({
     return () => {
       isMounted = false;
     };
-  }, [pontos, selectedPontoId, onSelectPonto]);
+  }, [isReady, pontos, selectedPontoId, onSelectPonto]);
+
+  // Cleanup ao desmontar
+  useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
 
   return (
-    <div className="w-full h-full min-h-[450px] rounded-2xl overflow-hidden shadow-xs border border-slate-200/80 relative z-0">
-      <div ref={mapContainerRef} className="w-full h-full min-h-[450px]" />
+    <div className="w-full h-full min-h-[500px] rounded-2xl overflow-hidden shadow-sm border border-slate-200/80 relative z-0 bg-slate-100">
+      <div ref={mapContainerRef} className="w-full h-full min-h-[500px]" />
     </div>
   );
 }

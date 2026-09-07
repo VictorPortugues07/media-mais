@@ -8,6 +8,7 @@ const perfilPontoSchema = z.object({
   nome: z.string().min(2),
   whatsapp: z.string().min(10),
   senha: z.string().min(6).optional().or(z.literal("")),
+  avatarUrl: z.string().optional().nullable(),
   nomeEmpresa: z.string().min(2),
   responsavel: z.string().min(2),
   instagramSite: z.string().optional().nullable(),
@@ -28,6 +29,9 @@ const perfilPontoSchema = z.object({
   faixaEtariaPublico: z.array(z.string()),
   generoPublico: z.string().min(1),
   horariosPico: z.string().optional().nullable(),
+  horarioAbertura: z.string().optional().nullable(),
+  horarioFechamento: z.string().optional().nullable(),
+  diasFuncionamento: z.array(z.string()).optional(),
   fotos: z.array(z.string()).optional(),
 });
 
@@ -54,6 +58,7 @@ export async function GET() {
       nome: user.nome,
       email: user.email,
       whatsapp: user.whatsapp,
+      avatarUrl: user.avatarUrl,
     },
     ponto: user.pontoMidia,
   });
@@ -82,6 +87,10 @@ export async function PUT(request: NextRequest) {
       nome: data.nome,
       whatsapp: data.whatsapp,
     };
+
+    if (data.avatarUrl !== undefined) {
+      userUpdateData.avatarUrl = data.avatarUrl;
+    }
 
     if (data.senha && data.senha.trim().length >= 6) {
       const bcrypt = await import("bcryptjs");
@@ -143,6 +152,9 @@ export async function PUT(request: NextRequest) {
         faixaEtariaPublico: data.faixaEtariaPublico,
         generoPublico: data.generoPublico,
         horariosPico: data.horariosPico,
+        horarioAbertura: data.horarioAbertura || userPonto.horarioAbertura,
+        horarioFechamento: data.horarioFechamento || userPonto.horarioFechamento,
+        diasFuncionamento: data.diasFuncionamento || userPonto.diasFuncionamento,
         fotos: data.fotos || userPonto.fotos,
         lat: geo.lat,
         lng: geo.lng,

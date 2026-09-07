@@ -7,18 +7,25 @@ const SECRET = new TextEncoder().encode(
 );
 
 const PUBLIC_ROUTES = ["/", "/login", "/cadastro", "/player"];
-const TV_ROUTES = /^\/(tv\/|player)/;
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes - allow
-  if (PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
+  // TV player pareado é a rota pública legítima para telas
+  if (pathname === "/player") {
     return NextResponse.next();
   }
 
-  // TV player routes - allow (no auth needed for display)
-  if (TV_ROUTES.test(pathname)) {
+  // Se tentar acessar rota antiga /tv/[pontoId] sem autenticação, redireciona para o player oficial
+  if (pathname.startsWith("/tv/")) {
+    const token = request.cookies.get("mm_session")?.value;
+    if (!token) {
+      return NextResponse.redirect(new URL("/player", request.url));
+    }
+  }
+
+  // Public routes - allow
+  if (PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
     return NextResponse.next();
   }
 

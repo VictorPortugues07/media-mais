@@ -93,7 +93,7 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
 
   const notificacoesHref =
     role === "ADMIN"
-      ? "/admin/dashboard"
+      ? "/admin/notificacoes"
       : role === "PONTO"
       ? "/ponto/notificacoes"
       : "/anunciante/notificacoes";

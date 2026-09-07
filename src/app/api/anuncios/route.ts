@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const status = searchParams.get("status");
   const pontoId = searchParams.get("pontoId");
+  const anuncianteId = searchParams.get("anuncianteId");
 
   const where: Record<string, unknown> = {};
 
@@ -39,6 +40,12 @@ export async function GET(request: NextRequest) {
 
   if (status) where.status = status;
   if (pontoId) where.pontoMidiaId = parseInt(pontoId);
+  if (anuncianteId && session.role === "ADMIN") {
+    where.anuncianteId = parseInt(anuncianteId);
+  }
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
 
   const anuncios = await prisma.anuncio.findMany({
     where,
@@ -47,13 +54,69 @@ export async function GET(request: NextRequest) {
         select: { nomeEmpresa: true, categoria: true, userId: true },
       },
       pontoMidia: {
-        select: { nomeEmpresa: true, cidade: true, uf: true, userId: true },
+        select: {
+          id: true,
+          nomeEmpresa: true,
+          cidade: true,
+          uf: true,
+          userId: true,
+          ultimaAtividade: true,
+          diasFuncionamento: true,
+          horarioAbertura: true,
+          horarioFechamento: true,
+        },
+      },
+      _count: {
+        select: {
+          registroExibicoes: true,
+        },
       },
     },
     orderBy: { criadoEm: "desc" },
   });
 
-  return Response.json({ anuncios });
+  const doisMinutosAtras = new Date(Date.now() - 2 * 60 * 1000);
+
+  // Buscar contagem de hoje e última exibição para cada anúncio
+  const metricasAnuncios = await Promise.all(
+    anuncios.map(async (a) => {
+      const [exibicoesHoje, ultimaExibicao] = await Promise.all([
+        prisma.registroExibicao.count({
+          where: {
+            anuncioId: a.id,
+            exibidoEm: { gte: hoje },
+          },
+        }),
+        prisma.registroExibicao.findFirst({
+          where: { anuncioId: a.id },
+          orderBy: { exibidoEm: "desc" },
+          select: { exibidoEm: true },
+        }),
+      ]);
+
+      const isOnline = a.pontoMidia.ultimaAtividade
+        ? new Date(a.pontoMidia.ultimaAtividade) > doisMinutosAtras
+        : false;
+
+      const totalExibicoes = a._count.registroExibicoes;
+      const totalSegundos = totalExibicoes * a.duracaoSegundos;
+      const totalMinutos = Math.round(totalSegundos / 60);
+
+      return {
+        ...a,
+        totalExibicoes,
+        exibicoesHoje,
+        totalMinutosExibidos: totalMinutos,
+        ultimaExibicao: ultimaExibicao?.exibidoEm || null,
+        pontoMidia: {
+          ...a.pontoMidia,
+          tvOnline: isOnline,
+        },
+      };
+    })
+  );
+
+  return Response.json({ anuncios: metricasAnuncios });
 }
 
 export async function POST(request: NextRequest) {

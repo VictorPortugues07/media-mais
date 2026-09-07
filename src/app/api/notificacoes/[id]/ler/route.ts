@@ -14,8 +14,17 @@ export async function PATCH(
   const { id } = await ctx.params;
   const notifId = parseInt(id);
 
+  if (isNaN(notifId)) {
+    return Response.json({ error: "ID inválido" }, { status: 400 });
+  }
+
+  const where: Record<string, unknown> = { id: notifId };
+  if (session.role !== "ADMIN") {
+    where.userId = session.userId;
+  }
+
   await prisma.notificacao.updateMany({
-    where: { id: notifId, userId: session.userId },
+    where,
     data: { lida: true },
   });
 

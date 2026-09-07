@@ -70,17 +70,50 @@ function NovoAnuncioForm() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      setFile(selectedFile);
+      setError("");
 
       if (selectedFile.type.startsWith("video/")) {
-        setTipoMidia("VIDEO");
+        const tempVideo = document.createElement("video");
+        tempVideo.preload = "metadata";
+        tempVideo.src = URL.createObjectURL(selectedFile);
+
+        tempVideo.onloadedmetadata = () => {
+          window.URL.revokeObjectURL(tempVideo.src);
+          const duration = Math.round(tempVideo.duration);
+
+          if (duration > 60) {
+            setError(
+              `O vídeo selecionado tem ${duration}s de duração. O limite máximo permitido por anúncio é de 60 segundos.`
+            );
+            setFile(null);
+            setPreviewUrl(null);
+            return;
+          }
+
+          setTipoMidia("VIDEO");
+          setDuracaoSegundos(duration > 0 ? duration : 15);
+          setFile(selectedFile);
+          const objectUrl = URL.createObjectURL(selectedFile);
+          setPreviewUrl(objectUrl);
+        };
       } else {
         setTipoMidia("IMAGEM");
+        setFile(selectedFile);
+        const objectUrl = URL.createObjectURL(selectedFile);
+        setPreviewUrl(objectUrl);
       }
-
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setPreviewUrl(objectUrl);
     }
+  };
+
+  const handleRemoveSelectedFile = () => {
+    if (previewUrl) {
+      window.URL.revokeObjectURL(previewUrl);
+    }
+    setFile(null);
+    setPreviewUrl(null);
+    setTipoMidia("IMAGEM");
+    setDuracaoSegundos(10);
+    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -207,28 +240,6 @@ function NovoAnuncioForm() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Tempo de Exibição por Loop (segundos)"
-                  type="number"
-                  min={5}
-                  max={60}
-                  required
-                  value={duracaoSegundos}
-                  onChange={(e) => setDuracaoSegundos(Number(e.target.value))}
-                  helperText="Para imagens, o padrão recomendado é entre 10 e 15 segundos."
-                />
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Formato Detectado
-                  </label>
-                  <div className="h-10.5 flex items-center px-3.5 bg-blue-50/50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700">
-                    {tipoMidia === "VIDEO" ? "🎬 Vídeo (MP4/WebM)" : "🖼️ Imagem (JPG/PNG)"}
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                   Arquivo de Mídia (Proporção recomendada: 16:9 Paisagem)
@@ -269,6 +280,27 @@ function NovoAnuncioForm() {
                     </span>
                   </label>
                 </div>
+
+                {file && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-bold text-blue-900">
+                        {tipoMidia === "VIDEO" ? "🎬 Vídeo Selecionado:" : "🖼️ Imagem Selecionada:"}
+                      </span>
+                      <span className="text-slate-700 font-semibold truncate">{file.name}</span>
+                      <span className="text-slate-400 shrink-0">
+                        ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveSelectedFile}
+                      className="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs transition cursor-pointer self-start sm:self-auto flex items-center gap-1 shrink-0"
+                    >
+                      ✕ Remover arquivo
+                    </button>
+                  </div>
+                )}
 
                 {previewUrl && (
                   <div className="mt-4">

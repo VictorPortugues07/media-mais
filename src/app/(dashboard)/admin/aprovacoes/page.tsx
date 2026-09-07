@@ -38,8 +38,13 @@ export default function AdminAprovacoesPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [adToDelete, setAdToDelete] = useState<AnuncioPendente | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [selectedAdId, setSelectedAdId] = useState<number | null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadAnuncios = async () => {
     try {
@@ -70,11 +75,13 @@ export default function AdminAprovacoesPage() {
   const handleAprovar = async (id: number) => {
     setActionLoading(id);
     try {
-      const res = await fetch(`/api/anuncios/${id}/aprovar`, {
-        method: "PATCH",
-      });
+      const res = await fetch(`/api/anuncios/${id}/aprovar`, { method: "PATCH" });
       if (res.ok) {
         setAnuncios((prev) => prev.filter((a) => a.id !== id));
+        setApproveModalOpen(false);
+        setSelectedAdId(null);
+        setToastMessage("Campanha aprovada e liberada na TV com sucesso!");
+        setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (err) {
       console.error("Aprovar error:", err);
@@ -83,10 +90,46 @@ export default function AdminAprovacoesPage() {
     }
   };
 
+  const handleOpenApprove = (id: number) => {
+    setSelectedAdId(id);
+    setApproveModalOpen(true);
+  };
+
   const handleOpenReject = (id: number) => {
     setSelectedAdId(id);
     setMotivoRejeicao("");
     setRejectModalOpen(true);
+  };
+
+  const handleOpenDelete = (ad: AnuncioPendente) => {
+    setAdToDelete(ad);
+    setDeleteError("");
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!adToDelete) return;
+
+    setActionLoading(adToDelete.id);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/anuncios/${adToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir anúncio");
+
+      setAnuncios((prev) => prev.filter((a) => a.id !== adToDelete.id));
+      setDeleteModalOpen(false);
+      setAdToDelete(null);
+      setToastMessage("Anúncio excluído definitivamente com sucesso!");
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao excluir anúncio";
+      setDeleteError(msg);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleConfirmReject = async () => {
@@ -102,6 +145,8 @@ export default function AdminAprovacoesPage() {
       if (res.ok) {
         setAnuncios((prev) => prev.filter((a) => a.id !== selectedAdId));
         setRejectModalOpen(false);
+        setToastMessage("Campanha recusada e anunciante notificado!");
+        setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (err) {
       console.error("Rejeitar error:", err);
@@ -218,7 +263,7 @@ export default function AdminAprovacoesPage() {
                           variant="success"
                           size="md"
                           loading={actionLoading === anuncio.id}
-                          onClick={() => handleAprovar(anuncio.id)}
+                          onClick={() => handleOpenApprove(anuncio.id)}
                         >
                           <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -234,6 +279,19 @@ export default function AdminAprovacoesPage() {
                         >
                           Rejeitar Peça
                         </Button>
+
+                        <button
+                          type="button"
+                          title="Excluir campanha definitivamente"
+                          disabled={actionLoading === anuncio.id}
+                          onClick={() => handleOpenDelete(anuncio)}
+                          className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 border border-slate-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Excluir
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -243,6 +301,31 @@ export default function AdminAprovacoesPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Modal
+        isOpen={approveModalOpen}
+        onClose={() => setApproveModalOpen(false)}
+        title="Confirmar Aprovação"
+        description="Esta ação é irreversível. Após aprovada, a campanha será exibida na TV imediatamente."
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+            A campanha será liberada para transmissão na TV de destino. Anunciante e dono da tela serão notificados.
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setApproveModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="success"
+              loading={actionLoading === selectedAdId}
+              onClick={() => selectedAdId && handleAprovar(selectedAdId)}
+            >
+              Confirmar Aprovação
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={rejectModalOpen}
@@ -279,6 +362,68 @@ export default function AdminAprovacoesPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal de Exclusão Definitiva */}
+      <Modal
+        isOpen={deleteModalOpen}
+        onClose={() => actionLoading !== adToDelete?.id && setDeleteModalOpen(false)}
+        title="Excluir Campanha Definitivamente"
+        description="Esta ação apagará permanentemente o anúncio e a mídia do servidor."
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
+              {deleteError}
+            </div>
+          )}
+
+          {adToDelete && (
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
+              <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
+                {adToDelete.tipoMidia === "VIDEO" ? (
+                  <video src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
+                ) : (
+                  <img src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-slate-900 text-sm truncate">{adToDelete.titulo}</p>
+                <p className="text-xs text-slate-500 truncate">
+                  {adToDelete.anunciante.nomeEmpresa} → {adToDelete.pontoMidia.nomeEmpresa}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            O arquivo físico de mídia será apagado do servidor e o registro do anúncio será excluído. O anunciante será notificado sobre a remoção.
+          </p>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setDeleteModalOpen(false)} disabled={actionLoading === adToDelete?.id}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              loading={actionLoading === adToDelete?.id}
+              onClick={handleConfirmDelete}
+            >
+              Confirmar Exclusão
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-emerald-700 text-white rounded-2xl shadow-xl text-xs font-bold animate-fade-in border border-emerald-500">
+          <svg className="w-4 h-4 text-emerald-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{toastMessage}</span>
+          <button type="button" onClick={() => setToastMessage(null)} className="ml-2 text-emerald-200 hover:text-white cursor-pointer">✕</button>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

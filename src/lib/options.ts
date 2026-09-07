@@ -66,3 +66,13 @@ export const LOCAIS_INSTALACAO = [
   "Area de refeicoes",
   "Outro",
 ];
+
+export const DIAS_SEMANA = [
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+  "Domingo",
+];

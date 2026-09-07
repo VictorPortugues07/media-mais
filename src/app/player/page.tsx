@@ -26,6 +26,7 @@ interface PontoInfo {
 
 export default function StandaloneTVPlayerPage() {
   const [pairedCode, setPairedCode] = useState<string>("");
+  const [pairToken, setPairToken] = useState<string>("");
   const [codeDigits, setCodeDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [activeDigitIndex, setActiveDigitIndex] = useState<number>(0);
   const [ponto, setPonto] = useState<PontoInfo | null>(null);
@@ -35,23 +36,77 @@ export default function StandaloneTVPlayerPage() {
   const [connecting, setConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [pageVisible, setPageVisible] = useState(true);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 1. Carregar código salvo no LocalStorage
+  // Detectar tipo de dispositivo e resolucao
+  const getDeviceInfo = () => {
+    const ua = navigator.userAgent || "";
+    const screenW = window.screen.width;
+    const screenH = window.screen.height;
+    const isPortrait = screenH > screenW;
+    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
+    const isSmartTV = /SmartTV|Smart-TV|SMART-TV|GoogleTV|Tizen|webOS|NetCast|BRAVIA|Roku|Fire TV|AppleTV|CrKey|AFTN|AFTM/i.test(ua);
+
+    let deviceType: "SMART_TV" | "DESKTOP" | "TABLET" | "MOBILE" = "DESKTOP";
+    if (isSmartTV) deviceType = "SMART_TV";
+    else if (isMobile) deviceType = "MOBILE";
+    else if (isTablet) deviceType = "TABLET";
+
+    return {
+      deviceType,
+      screenResolution: `${screenW}x${screenH}`,
+      isPortrait,
+      isMobile: isMobile && !isTablet,
+      userAgent: ua.substring(0, 200),
+    };
+  };
+
+  // Detectar visibilidade da pagina (minimizado, troca de app, etc)
   useEffect(() => {
-    const savedCode = localStorage.getItem("mediamais_tv_code");
-    if (savedCode && savedCode.length === 6) {
-      setPairedCode(savedCode);
-      connectWithCode(savedCode);
-    } else {
-      setLoading(false);
-    }
+    const handleVisibilityChange = () => {
+      setPageVisible(!document.hidden);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
-  // 2. Conectar à API com o código
+  // Desbloquear audio em caso de restricao de autoplay do navegador
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (videoRef.current) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1;
+        videoRef.current.play().catch(() => {});
+      }
+    };
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
+  // Detectar dispositivo mobile na inicializacao
+  useEffect(() => {
+    const info = getDeviceInfo();
+    // Bloquear se for mobile (celular, nao tablet)
+    // Tela pequena em retrato e com user agent de celular
+    if (info.isMobile && info.isPortrait && window.screen.width < 768) {
+      setIsMobileDevice(true);
+    }
+    setLoading(false);
+  }, []);
+
+  // 2. Conectar à API com o código rotativo
   const connectWithCode = async (code: string) => {
     setConnecting(true);
     setErrorMessage("");
@@ -60,56 +115,102 @@ export default function StandaloneTVPlayerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Erro ao conectar TV");
+        throw new Error(data.error || "Código expirado ou inválido.");
       }
 
       setPonto(data.ponto);
       setAnuncios(data.anuncios || []);
       setPairedCode(code);
-      localStorage.setItem("mediamais_tv_code", code);
+      setPairToken(data.token || "");
       setLoading(false);
+
+      // Envia heartbeat imediato para atualizar status no painel instantaneamente
+      const deviceInfo = getDeviceInfo();
+      fetch("/api/tv/telemetria", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pontoId: data.ponto.id,
+          heartbeatOnly: true,
+          deviceType: deviceInfo.deviceType,
+          screenResolution: deviceInfo.screenResolution,
+        }),
+      }).catch(() => {});
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Código inválido";
+      const msg = err instanceof Error ? err.message : "Código inválido ou expirado";
       setErrorMessage(msg);
       setPairedCode("");
-      localStorage.removeItem("mediamais_tv_code");
+      setCodeDigits(["", "", "", "", "", ""]);
+      digitInputRefs.current[0]?.focus();
+      setActiveDigitIndex(0);
       setLoading(false);
     } finally {
       setConnecting(false);
     }
   };
 
-  // 3. Polling para atualizar a playlist e manter telemetria / heartbeat
+  // 3. Polling para sincronizar novas campanhas e telemetria / heartbeat contínuo
   useEffect(() => {
     if (!ponto?.id) return;
 
-    const interval = setInterval(async () => {
+    // Notificar desconexão imediata ao fechar a janela / sair do player
+    const handleUnload = () => {
+      if (ponto?.id) {
+        navigator.sendBeacon?.(
+          "/api/tv/telemetria",
+          JSON.stringify({ pontoId: ponto.id, offline: true })
+        );
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
+    // Heartbeat a cada 4 segundos para status em tempo real sem delay
+    const heartbeatInterval = setInterval(async () => {
+      if (!pageVisible) return;
       try {
-        if (pairedCode) {
-          const res = await fetch(`/api/tv/parear?codigo=${pairedCode}`);
-          if (res.ok) {
-            const data = await res.json();
-            setAnuncios(data.anuncios || []);
-          }
-        }
-        // Heartbeat
+        const deviceInfo = getDeviceInfo();
         await fetch("/api/tv/telemetria", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pontoId: ponto.id, heartbeatOnly: true }),
+          body: JSON.stringify({
+            pontoId: ponto.id,
+            heartbeatOnly: true,
+            deviceType: deviceInfo.deviceType,
+            screenResolution: deviceInfo.screenResolution,
+          }),
         });
+      } catch (err) {
+        console.error("Heartbeat error:", err);
+      }
+    }, 4000);
+
+    // Polling de sincronização de anúncios a cada 15 segundos
+    const syncInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tv/parear?pontoId=${ponto.id}&token=${encodeURIComponent(pairToken)}`, {
+          headers: pairToken ? { "x-tv-token": pairToken } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAnuncios(data.anuncios || []);
+        }
       } catch (err) {
         console.error("Polling error:", err);
       }
     }, 15000);
 
-    return () => clearInterval(interval);
-  }, [ponto?.id, pairedCode]);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      clearInterval(heartbeatInterval);
+      clearInterval(syncInterval);
+    };
+  }, [ponto?.id, pageVisible, pairToken]);
 
   // 4. Registro de telemetria ao rodar anúncio
   const registrarExibicao = async (ad: TVAnuncio) => {
     if (!ponto?.id) return;
     try {
+      const deviceInfo = getDeviceInfo();
       await fetch("/api/tv/telemetria", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,6 +219,8 @@ export default function StandaloneTVPlayerPage() {
           anuncioId: ad.id,
           duracaoSegundos: ad.duracaoSegundos || 10,
           tipoMidia: ad.tipoMidia,
+          deviceType: deviceInfo.deviceType,
+          screenResolution: deviceInfo.screenResolution,
         }),
       });
     } catch (err) {
@@ -125,14 +228,28 @@ export default function StandaloneTVPlayerPage() {
     }
   };
 
-  // 5. Rotação de anúncios
+  // 5. Rotação de anúncios contínua e resiliente (suporta 1 único anúncio ou múltiplos em loop)
   const nextAd = () => {
     if (anuncios.length === 0) return;
     const currentAd = anuncios[currentIndex];
     if (currentAd) {
       registrarExibicao(currentAd);
     }
-    setCurrentIndex((prev) => (prev + 1) % anuncios.length);
+
+    if (anuncios.length === 1) {
+      // Se tiver só 1 vídeo ou imagem, reinicia ele sem travar
+      if (currentAd.tipoMidia === "VIDEO" && videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1;
+        videoRef.current.play().catch(() => {});
+      } else {
+        // Imagem única: aciona timeout novamente
+        setCurrentIndex(0);
+      }
+    } else {
+      setCurrentIndex((prev) => (prev + 1) % anuncios.length);
+    }
   };
 
   useEffect(() => {
@@ -150,6 +267,12 @@ export default function StandaloneTVPlayerPage() {
       timerRef.current = setTimeout(() => {
         nextAd();
       }, durationMs);
+    } else if (currentAd.tipoMidia === "VIDEO") {
+      // Timeout de segurança caso o evento 'onEnded' do vídeo falhe no navegador da Smart TV
+      const maxVideoDurationMs = ((currentAd.duracaoSegundos || 60) + 3) * 1000;
+      timerRef.current = setTimeout(() => {
+        nextAd();
+      }, maxVideoDurationMs);
     }
 
     return () => {
@@ -157,60 +280,35 @@ export default function StandaloneTVPlayerPage() {
     };
   }, [currentIndex, anuncios, ponto]);
 
-  // Teclado numérico / input handlers
-  const handleDigitChange = (index: number, val: string) => {
-    const numeric = val.replace(/\D/g, "").slice(-1);
-    const newDigits = [...codeDigits];
-    newDigits[index] = numeric;
-    setCodeDigits(newDigits);
-
-    if (numeric && index < 5) {
-      digitInputRefs.current[index + 1]?.focus();
-      setActiveDigitIndex(index + 1);
-    }
-
-    const fullCode = newDigits.join("");
-    if (fullCode.length === 6 && !newDigits.includes("")) {
-      connectWithCode(fullCode);
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !codeDigits[index] && index > 0) {
-      digitInputRefs.current[index - 1]?.focus();
-      setActiveDigitIndex(index - 1);
-    }
-  };
-
+  // Teclado numérico / input handlers com suporte a controle remoto de Smart TV
   const handleVirtualKey = (num: string) => {
+    if (connecting) return;
+
     if (num === "clear") {
       setCodeDigits(["", "", "", "", "", ""]);
-      digitInputRefs.current[0]?.focus();
       setActiveDigitIndex(0);
       return;
     }
     if (num === "backspace") {
-      const idx = activeDigitIndex > 0 && !codeDigits[activeDigitIndex] ? activeDigitIndex - 1 : activeDigitIndex;
-      const newDigits = [...codeDigits];
-      newDigits[idx] = "";
-      setCodeDigits(newDigits);
-      digitInputRefs.current[idx]?.focus();
-      setActiveDigitIndex(idx);
+      const lastFilledIdx = [...codeDigits].reverse().findIndex((d) => d !== "");
+      if (lastFilledIdx !== -1) {
+        const realIdx = 5 - lastFilledIdx;
+        const newDigits = [...codeDigits];
+        newDigits[realIdx] = "";
+        setCodeDigits(newDigits);
+        setActiveDigitIndex(realIdx);
+      }
       return;
     }
 
     // Achar primeiro dígito vazio
     const emptyIdx = codeDigits.findIndex((d) => d === "");
-    const targetIdx = emptyIdx !== -1 ? emptyIdx : 5;
+    if (emptyIdx === -1) return; // Já tem 6 dígitos
 
     const newDigits = [...codeDigits];
-    newDigits[targetIdx] = num;
+    newDigits[emptyIdx] = num;
     setCodeDigits(newDigits);
-
-    if (targetIdx < 5) {
-      digitInputRefs.current[targetIdx + 1]?.focus();
-      setActiveDigitIndex(targetIdx + 1);
-    }
+    setActiveDigitIndex(emptyIdx < 5 ? emptyIdx + 1 : 5);
 
     const fullCode = newDigits.join("");
     if (fullCode.length === 6 && !newDigits.includes("")) {
@@ -218,10 +316,43 @@ export default function StandaloneTVPlayerPage() {
     }
   };
 
+  // Suporte global para controle remoto de Smart TV (teclas numéricas físicas 0-9)
+  useEffect(() => {
+    if (ponto) return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (connecting) return;
+
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleVirtualKey(e.key);
+      } else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        handleVirtualKey("backspace");
+      } else if (e.key === "Enter") {
+        const fullCode = codeDigits.join("");
+        if (fullCode.length === 6 && !codeDigits.includes("")) {
+          e.preventDefault();
+          connectWithCode(fullCode);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [ponto, codeDigits, connecting]);
+
   const desconectarTV = () => {
-    if (confirm("Deseja realmente desconectar esta TV e trocar o código?")) {
-      localStorage.removeItem("mediamais_tv_code");
+    if (confirm("Deseja desconectar esta TV e voltar para a tela de digitação do código?")) {
+      if (ponto?.id) {
+        fetch("/api/tv/telemetria", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pontoId: ponto.id, offline: true }),
+        }).catch(() => {});
+      }
       setPairedCode("");
+      setPairToken("");
       setPonto(null);
       setAnuncios([]);
       setCodeDigits(["", "", "", "", "", ""]);
@@ -252,6 +383,41 @@ export default function StandaloneTVPlayerPage() {
     );
   }
 
+  // BLOQUEIO: Dispositivo mobile detectado
+  if (isMobileDevice) {
+    return (
+      <div className="w-screen min-h-screen bg-[#030930] flex flex-col items-center justify-center p-6 text-white select-none">
+        <div className="w-full max-w-md flex flex-col items-center text-center">
+          <Logo className="h-10 w-auto mb-6" whiteText />
+
+          <div className="bg-[#07154a]/90 backdrop-blur-xl border border-amber-500/30 p-8 rounded-3xl shadow-2xl w-full">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center text-3xl mx-auto mb-4">
+              &#128249;
+            </div>
+            <h1 className="text-xl font-extrabold font-heading text-white tracking-tight">
+              Player Exclusivo para Smart TV
+            </h1>
+            <p className="text-xs text-amber-200/80 mt-3 leading-relaxed">
+              Este player foi desenvolvido exclusivamente para ser exibido em Smart TVs e monitores de grande formato.
+            </p>
+            <p className="text-xs text-blue-200/60 mt-2 leading-relaxed">
+              Para conectar sua TV, acesse este link diretamente no navegador da sua Smart TV e digite o codigo de 6 digitos gerado no seu painel.
+            </p>
+
+            <div className="mt-5 p-3 bg-amber-500/10 border border-amber-400/20 rounded-xl">
+              <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
+                Dispositivo detectado: Celular
+              </p>
+              <p className="text-[10px] text-amber-200/60 mt-1">
+                Resolucao: {typeof window !== "undefined" ? `${window.screen.width}x${window.screen.height}` : "N/A"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // TELA 1: Pareamento por Código Numérico
   if (!ponto) {
     return (
@@ -276,31 +442,26 @@ export default function StandaloneTVPlayerPage() {
               </div>
             )}
 
-            {/* Inputs de 6 Dígitos */}
-            <div className="flex justify-center gap-2 sm:gap-3 my-8">
-              {codeDigits.map((digit, idx) => (
-                <input
-                  key={idx}
-                  ref={(el) => {
-                    digitInputRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  disabled={connecting}
-                  onFocus={() => setActiveDigitIndex(idx)}
-                  onChange={(e) => handleDigitChange(idx, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(idx, e)}
-                  className={`w-12 h-16 sm:w-16 sm:h-20 text-2xl sm:text-3xl font-black text-center rounded-2xl border-2 outline-none transition-all ${
-                    digit
-                      ? "bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/30"
-                      : activeDigitIndex === idx
-                      ? "bg-blue-950/80 text-white border-blue-400 ring-4 ring-blue-500/20"
-                      : "bg-[#050e38] text-blue-200 border-blue-900/60"
-                  }`}
-                />
-              ))}
+            {/* Visualização dos 6 Dígitos em Destaque para Leitura à Distância na TV */}
+            <div className="flex justify-center gap-2 sm:gap-3.5 my-6 sm:my-8">
+              {codeDigits.map((digit, idx) => {
+                const isCurrent = activeDigitIndex === idx;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setActiveDigitIndex(idx)}
+                    className={`w-12 h-16 sm:w-16 sm:h-22 text-3xl sm:text-4xl font-black font-mono flex items-center justify-center rounded-2xl border-2 transition-all cursor-pointer ${
+                      digit
+                        ? "bg-blue-600 text-white border-blue-400 shadow-xl shadow-blue-500/30 scale-100"
+                        : isCurrent
+                        ? "bg-blue-950/90 text-blue-200 border-sky-400 ring-4 ring-sky-400/30 animate-pulse"
+                        : "bg-[#040c30] text-blue-300/40 border-blue-900/60"
+                    }`}
+                  >
+                    {digit ? digit : isCurrent ? "_" : "•"}
+                  </div>
+                );
+              })}
             </div>
 
             {connecting && (
@@ -310,44 +471,60 @@ export default function StandaloneTVPlayerPage() {
               </div>
             )}
 
-            {/* Teclado Virtual Numérico em Tela (Fácil para Smart TV e Controle Remoto) */}
+            {/* Teclado Virtual Numérico em Tela com foco ampliado para Controle Remoto D-pad */}
             <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                 <button
                   key={num}
                   type="button"
+                  tabIndex={0}
                   onClick={() => handleVirtualKey(num.toString())}
-                  className="h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 border border-white/15 text-xl font-bold text-white transition cursor-pointer flex items-center justify-center"
+                  className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 focus:bg-blue-600 focus:ring-4 focus:ring-sky-400 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
                 >
                   {num}
                 </button>
               ))}
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => handleVirtualKey("clear")}
-                className="h-14 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-400/20 text-xs font-bold transition cursor-pointer"
+                className="h-14 sm:h-16 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 focus:bg-rose-600 focus:ring-4 focus:ring-rose-400 focus:scale-105 text-rose-200 focus:text-white border border-rose-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center"
               >
                 LIMPAR
               </button>
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => handleVirtualKey("0")}
-                className="h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 border border-white/15 text-xl font-bold text-white transition cursor-pointer flex items-center justify-center"
+                className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 focus:bg-blue-600 focus:ring-4 focus:ring-sky-400 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
               >
                 0
               </button>
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => handleVirtualKey("backspace")}
-                className="h-14 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/20 text-xs font-bold transition cursor-pointer"
+                className="h-14 sm:h-16 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 focus:bg-amber-600 focus:ring-4 focus:ring-amber-400 focus:scale-105 text-amber-200 focus:text-white border border-amber-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center"
               >
                 ⌫ APAGAR
               </button>
             </div>
+
+            {codeDigits.join("").length === 6 && !codeDigits.includes("") && (
+              <button
+                type="button"
+                tabIndex={0}
+                onClick={() => connectWithCode(codeDigits.join(""))}
+                disabled={connecting}
+                className="w-full max-w-xs mx-auto mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 focus:ring-4 focus:ring-emerald-300 focus:scale-[1.02] font-black text-sm text-white shadow-xl shadow-emerald-500/30 transition-all cursor-pointer outline-none flex items-center justify-center gap-2"
+              >
+                <span>✓ CONECTAR TV AGORA</span>
+              </button>
+            )}
           </div>
 
-          <p className="text-xs text-blue-300/50 mt-6">
-            Dica: Uma vez pareada, esta TV guardará o código e iniciará automaticamente sempre que ligada.
+          <p className="text-xs text-blue-200/60 mt-6 max-w-md mx-auto leading-relaxed">
+            Dica para Smart TV: você pode digitar os números (0 a 9) diretamente no teclado do seu controle remoto ou usar as setas e o botão OK.
           </p>
         </div>
       </div>
@@ -424,11 +601,16 @@ export default function StandaloneTVPlayerPage() {
         {currentAd.tipoMidia === "VIDEO" ? (
           <video
             ref={videoRef}
-            key={currentAd.id}
+            key={`${currentAd.id}-${currentIndex}`}
             src={currentAd.midiaUrl}
             autoPlay
-            muted
             playsInline
+            onPlay={() => {
+              if (videoRef.current) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = 1;
+              }
+            }}
             onEnded={nextAd}
             onError={() => {
               setTimeout(nextAd, 2000);
@@ -437,7 +619,7 @@ export default function StandaloneTVPlayerPage() {
           />
         ) : (
           <img
-            key={currentAd.id}
+            key={`${currentAd.id}-${currentIndex}`}
             src={currentAd.midiaUrl}
             alt={currentAd.titulo}
             className="w-full h-full object-contain animate-fade-in"

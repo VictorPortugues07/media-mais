@@ -1,5 +1,41 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { notificarTvOffline } from "@/lib/notificacoes";
+
+function isPontoEmHorarioFuncionamento(
+  diasFuncionamento: string[] | null,
+  horarioAbertura: string | null,
+  horarioFechamento: string | null
+): boolean {
+  try {
+    const agora = new Date();
+    // Dias em português indexados por getDay() [0: Domingo, 1: Segunda...]
+    const diasMap = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+    const diaHoje = diasMap[agora.getDay()];
+
+    const dias = diasFuncionamento && diasFuncionamento.length > 0
+      ? diasFuncionamento
+      : ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+
+    if (!dias.includes(diaHoje)) {
+      return false;
+    }
+
+    const abertura = horarioAbertura || "08:00";
+    const fechamento = horarioFechamento || "19:00";
+
+    const [horaAbre, minAbre] = abertura.split(":").map(Number);
+    const [horaFecha, minFecha] = fechamento.split(":").map(Number);
+
+    const minAtual = agora.getHours() * 60 + agora.getMinutes();
+    const minInicio = (horaAbre || 8) * 60 + (minAbre || 0);
+    const minFim = (horaFecha || 19) * 60 + (minFecha || 0);
+
+    return minAtual >= minInicio && minAtual <= minFim;
+  } catch {
+    return true;
+  }
+}
 
 export async function GET() {
   const session = await getSession();
@@ -41,6 +77,7 @@ export async function GET() {
     id: number;
     titulo: string;
     tipoMidia: string;
+    midiaUrl: string;
     duracaoSegundos: number;
     status: string;
     anunciante: string;
@@ -56,6 +93,7 @@ export async function GET() {
     codigoTv: string | null;
     status: string;
     online: boolean;
+    emHorarioFuncionamento: boolean;
     ultimaAtividade: Date | null;
     anunciosAtivos: number;
     totalExibicoes: number;
@@ -74,12 +112,16 @@ export async function GET() {
       prisma.pontoMidia.findMany({
         select: {
           id: true,
+          userId: true,
           nomeEmpresa: true,
           cidade: true,
           uf: true,
           codigoTv: true,
           status: true,
           ultimaAtividade: true,
+          diasFuncionamento: true,
+          horarioAbertura: true,
+          horarioFechamento: true,
           _count: {
             select: {
               anuncios: { where: { status: "ATIVO" } },
@@ -91,13 +133,16 @@ export async function GET() {
       }),
     ]);
 
-    // Calcular tempo total e status em tempo real
-    const doisMinutosAtras = new Date(Date.now() - 2 * 60 * 1000);
+    // Janela de 12 segundos para considerar online em tempo real (heartbeat é a cada 4s)
+    const limiteOnlineAtras = new Date(Date.now() - 12 * 1000);
+    // Limite de 10 minutos para disparar alerta
+    const dezMinutosAtras = new Date(Date.now() - 10 * 60 * 1000);
 
     auditoriaAnuncios = anunciosComMetricas.map((a) => ({
       id: a.id,
       titulo: a.titulo,
       tipoMidia: a.tipoMidia,
+      midiaUrl: a.midiaUrl,
       duracaoSegundos: a.duracaoSegundos,
       status: a.status,
       anunciante: a.anunciante.nomeEmpresa,
@@ -107,7 +152,15 @@ export async function GET() {
     }));
 
     statusPontosTv = pontosComAtividade.map((p) => {
-      const online = p.ultimaAtividade ? new Date(p.ultimaAtividade) > doisMinutosAtras : false;
+      const online = p.ultimaAtividade ? new Date(p.ultimaAtividade) > limiteOnlineAtras : false;
+      const emHorario = isPontoEmHorarioFuncionamento(p.diasFuncionamento, p.horarioAbertura, p.horarioFechamento);
+
+      // Se estiver em horário de funcionamento e sem sinal há mais de 10 minutos, dispara notificação
+      const semSinal10Min = !p.ultimaAtividade || new Date(p.ultimaAtividade) < dezMinutosAtras;
+      if (p.status === "ATIVO" && emHorario && semSinal10Min) {
+        notificarTvOffline(p.userId, p.nomeEmpresa).catch((err) => console.error(err));
+      }
+
       return {
         id: p.id,
         nomeEmpresa: p.nomeEmpresa,
@@ -115,6 +168,7 @@ export async function GET() {
         codigoTv: p.codigoTv,
         status: p.status,
         online,
+        emHorarioFuncionamento: emHorario,
         ultimaAtividade: p.ultimaAtividade,
         anunciosAtivos: p._count.anuncios,
         totalExibicoes: p._count.registroExibicoes,
@@ -151,14 +205,23 @@ export async function GET() {
         }),
       ]);
 
-      const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000);
-      const isOnline = ponto.ultimaAtividade ? new Date(ponto.ultimaAtividade) > cincoMinutosAtras : false;
+      const limiteOnlineAtras = new Date(Date.now() - 12 * 1000);
+      const isOnline = ponto.ultimaAtividade ? new Date(ponto.ultimaAtividade) > limiteOnlineAtras : false;
+      const emHorario = isPontoEmHorarioFuncionamento(ponto.diasFuncionamento, ponto.horarioAbertura, ponto.horarioFechamento);
+
+      // Validação de alerta 10 min offline em horário comercial
+      const dezMinutosAtras = new Date(Date.now() - 10 * 60 * 1000);
+      const semSinal10Min = !ponto.ultimaAtividade || new Date(ponto.ultimaAtividade) < dezMinutosAtras;
+      if (ponto.status === "ATIVO" && emHorario && semSinal10Min) {
+        notificarTvOffline(ponto.userId, ponto.nomeEmpresa).catch((err) => console.error(err));
+      }
 
       roleStats = {
         meusAnunciosAtivos: meusAnuncios,
         pontoId: ponto.id,
         codigoTv: ponto.codigoTv,
         tvOnline: isOnline,
+        emHorarioFuncionamento: emHorario,
         ultimaAtividade: ponto.ultimaAtividade,
         totalExibicoesPonto: ponto._count.registroExibicoes,
         exibicoesPontoHoje,

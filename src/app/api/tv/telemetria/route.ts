@@ -8,19 +8,50 @@ const telemetriaSchema = z.object({
   duracaoSegundos: z.number().optional(),
   tipoMidia: z.enum(["VIDEO", "IMAGEM"]).optional(),
   heartbeatOnly: z.boolean().optional(),
+  offline: z.boolean().optional(),
+  deviceType: z.enum(["SMART_TV", "DESKTOP", "TABLET", "MOBILE"]).optional(),
+  screenResolution: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: any;
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      body = await request.json();
+    } else {
+      const text = await request.text();
+      body = text ? JSON.parse(text) : {};
+    }
+
     const data = telemetriaSchema.parse(body);
 
+    // Se o player informou desconexão ou fechamento da aba
+    if (data.offline) {
+      await prisma.pontoMidia.update({
+        where: { id: data.pontoId },
+        data: { ultimaAtividade: null },
+      });
+      return Response.json({ success: true, offline: true });
+    }
+
     // 1. Atualizar timestamp de última atividade do ponto (Heartbeat)
+    //    Incluir dados do dispositivo para auditoria
+    const updateData: Record<string, unknown> = {
+      ultimaAtividade: new Date(),
+    };
+
+    // Salvar tipo de dispositivo e resolucao no ponto para auditoria do admin
+    if (data.deviceType) {
+      updateData.tipoDispositivo = data.deviceType;
+    }
+    if (data.screenResolution) {
+      updateData.resolucaoTela = data.screenResolution;
+    }
+
     await prisma.pontoMidia.update({
       where: { id: data.pontoId },
-      data: {
-        ultimaAtividade: new Date(),
-      },
+      data: updateData,
     });
 
     // 2. Se for uma exibição de anúncio finalizada, salvar registro
