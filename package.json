@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "security": "./script.sh",
+    "security:quick": "./script.sh --skip-dast",
+    "security:ci": "./script.sh --require-all"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

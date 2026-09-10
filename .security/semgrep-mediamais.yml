@@ -1,0 +1,190 @@
+# Regras Semgrep especificas da plataforma Media+
+#
+# Cada regra aqui corresponde a um defeito real encontrado na auditoria de
+# risco do projeto. O objetivo nao e cobertura generica - os pacotes publicos
+# do Semgrep cuidam disso - mas impedir que estes defeitos especificos
+# voltem em alteracoes futuras.
+
+rules:
+
+  # -------------------------------------------------------------------------
+  # Causa raiz C2 - falha silenciosa
+  # -------------------------------------------------------------------------
+
+  - id: mediamais-env-secret-fallback
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Variavel de ambiente sensivel com valor de reserva embutido. Com a
+      reserva presente, a aplicacao nao falha quando a variavel esta ausente:
+      ela sobe assinando sessoes com um valor que esta no repositorio. Remova
+      a reserva e faca a inicializacao abortar se a variavel nao existir.
+    metadata:
+      categoria: fail-open
+      referencia: "auditoria P1 - segredo de autenticacao embutido"
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+    patterns:
+      - pattern-either:
+          - pattern: process.env.$VAR || "..."
+          - pattern: process.env.$VAR ?? "..."
+          - pattern: process.env[$STR] || "..."
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ^(AUTH_SECRET|DATABASE_URL|DIRECT_URL|[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|APIKEY|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)$
+
+  - id: mediamais-empty-catch
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Bloco catch vazio: o erro e descartado sem registro nem tratamento.
+      Este e o padrao que faz a plataforma reportar saude enquanto esta
+      quebrada. Registre o erro ou propague-o.
+    metadata:
+      categoria: fail-open
+      referencia: "auditoria C2 - falha silenciosa como padrao"
+    pattern-either:
+      - pattern: |
+          try { ... } catch ($E) { }
+      - pattern: |
+          try { ... } catch { }
+      - pattern: $P.catch(() => {})
+      - pattern: $P.catch(($E) => {})
+      - pattern: $P.catch(async () => {})
+
+  - id: mediamais-unconditional-success-message
+    # Modo generico: casa em qualquer linguagem sem depender de parser, o que
+    # permite cobrir tambem os scripts de shell.
+    languages: [generic]
+    paths:
+      include:
+        - "src/**"
+        - "*.sh"
+        - "scripts/**"
+    severity: ERROR
+    message: >-
+      Mensagem de sucesso com afirmacao absoluta ("100% validado", "todas
+      validaram"). A auditoria encontrou scripts que imprimem sucesso sem
+      verificar nada, fabricando confianca falsa. Uma mensagem de sucesso
+      deve ser consequencia de uma verificacao, nunca incondicional.
+    metadata:
+      categoria: fail-open
+      referencia: "auditoria P1 - scripts de teste que sempre reportam sucesso"
+    pattern-regex: '(?i)(100\s*%\s*(validad|verificad|test)|todas\s+as\s+apis\s+validaram|tudo\s+(ok|certo)\s*!*\s*$)'
+
+  # -------------------------------------------------------------------------
+  # Injecao e tratamento de entrada
+  # -------------------------------------------------------------------------
+
+  - id: mediamais-prisma-raw-unsafe
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Uso de $executeRawUnsafe / $queryRawUnsafe. Estas funcoes nao
+      parametrizam a consulta. Se qualquer parte da string vier de entrada
+      externa, e injecao de SQL. Prefira $executeRaw / $queryRaw com
+      parametros, ou uma migration versionada para DDL.
+    metadata:
+      categoria: injecao
+      referencia: "auditoria P1 - DDL de producao via script avulso"
+      cwe: "CWE-89: SQL Injection"
+    pattern-regex: '\$(?:executeRawUnsafe|queryRawUnsafe)\s*\('
+
+  - id: mediamais-html-string-interpolation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      HTML montado por interpolacao de string e injetado no DOM (bindPopup,
+      divIcon, innerHTML, outerHTML). Campos preenchidos pelo usuario, como o
+      nome do estabelecimento, executam script na sessao de quem abrir a tela.
+      Escape o conteudo ou construa os nos via DOM/React.
+    metadata:
+      categoria: xss
+      referencia: "auditoria P1 - XSS armazenado no popup do mapa"
+      cwe: "CWE-79: Cross-site Scripting"
+    pattern-regex: '(?:bindPopup|bindTooltip|divIcon|innerHTML\s*=|outerHTML\s*=)\s*\(?\s*`[^`]*\$\{'
+
+  - id: mediamais-client-controlled-file-extension
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A extensao do arquivo salvo vem do nome enviado pelo cliente. Um envio
+      com extensao .html fica hospedado na propria origem da aplicacao e
+      executa com os privilegios dela. Derive a extensao do tipo de conteudo
+      verificado no servidor, a partir de uma lista permitida.
+    metadata:
+      categoria: upload
+      referencia: "auditoria P1 - extensao de upload controlada pelo cliente"
+      cwe: "CWE-434: Unrestricted Upload of File with Dangerous Type"
+    pattern-regex: '\.name\s*\.\s*split\([^)]*\)\s*\.\s*pop\(\s*\)'
+
+  # -------------------------------------------------------------------------
+  # Aleatoriedade e identificadores
+  # -------------------------------------------------------------------------
+
+  - id: mediamais-insecure-random-for-code
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Math.random() nao e criptograficamente seguro e seu estado e previsivel.
+      Codigos de pareamento de TV e qualquer identificador com valor de
+      autenticacao devem usar crypto.randomInt() ou crypto.randomBytes().
+    metadata:
+      categoria: cripto
+      referencia: "auditoria P2 - codigo de pareamento gerado com Math.random"
+      cwe: "CWE-338: Use of Cryptographically Weak PRNG"
+    pattern: Math.random()
+
+  # -------------------------------------------------------------------------
+  # Reproducao desassistida em TV
+  # -------------------------------------------------------------------------
+
+  - id: mediamais-autoplay-without-muted
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Elemento <video> com autoPlay e sem muted. Navegadores de Smart TV
+      bloqueiam reproducao automatica com audio sem gesto do usuario - gesto
+      que nunca acontece numa TV desassistida. O resultado e tela preta
+      enquanto a telemetria continua registrando exibicoes faturaveis.
+    metadata:
+      categoria: operacao
+      referencia: "auditoria P1 - achado mais custoso do relatorio"
+    patterns:
+      - pattern-either:
+          - pattern: <video autoPlay={...} ... />
+          - pattern: <video autoPlay ... />
+      - pattern-not: <video ... muted ... />
+      - pattern-not: <video ... muted={...} ... />
+
+  # -------------------------------------------------------------------------
+  # Configuracao
+  # -------------------------------------------------------------------------
+
+  - id: mediamais-next-dangerous-local-ip
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      dangerouslyAllowLocalIP permite que o otimizador de imagens busque
+      enderecos locais e de rede interna. Em nuvem isso alcanca endpoints de
+      metadados da infraestrutura. Restrinja a ambiente de desenvolvimento.
+    metadata:
+      categoria: ssrf
+      referencia: "auditoria P2 - otimizador de imagens com rede interna liberada"
+      cwe: "CWE-918: Server-Side Request Forgery"
+    pattern-regex: 'dangerouslyAllowLocalIP\s*:\s*true'
+
+  - id: mediamais-cascade-on-audit-table
+    languages: [generic]
+    paths:
+      include:
+        - "*.prisma"
+    severity: ERROR
+    message: >-
+      onDelete: Cascade em relacao da tabela de registros de exibicao. Essa
+      tabela e a unica evidencia de que um anuncio foi veiculado, e serve de
+      base para cobranca. Excluir um usuario apaga a prova em cascata, sem
+      possibilidade de recuperacao. Use Restrict ou SetNull.
+    metadata:
+      categoria: integridade
+      referencia: "auditoria P1 - cascade destroi evidencia de faturamento"
+    pattern-regex: 'model\s+RegistroExibicao[\s\S]{0,800}?onDelete:\s*Cascade'

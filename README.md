@@ -356,6 +356,80 @@ npm run start
 
 ---
 
+## 9. Pipeline de Segurança (DevSecOps) <a id="devsecops"></a>
+
+O arquivo `script.sh` na raiz executa a esteira de verificação de segurança do
+projeto. Todas as ferramentas rodam em container com tag fixa — nada é
+instalado na máquina. O único pré-requisito é Docker em execução e `jq`.
+
+```bash
+./script.sh                    # esteira completa (as 5 etapas)
+./script.sh --skip-dast        # rápido: sem subir banco nem compilar a aplicação
+./script.sh --stage sast,deps  # apenas as etapas indicadas
+./script.sh --dast-full        # varredura ativa do ZAP (lenta, envia payloads reais)
+./script.sh --help             # todas as opções
+```
+
+### Etapas e ferramentas
+
+| Etapa | Ferramenta | O que cobre |
+|---|---|---|
+| `secrets` | **Gitleaks** | Credenciais no código e em todo o histórico do Git |
+| `sast` | **Semgrep** | Análise estática: 10 conjuntos públicos + regras próprias do projeto |
+| `deps` | **npm audit**, **OSV-Scanner**, **Trivy** | Vulnerabilidades em dependências, segredos e má configuração |
+| `sbom` | **Syft** + **Grype** | Inventário de componentes (CycloneDX e SPDX) e vulnerabilidades nele |
+| `dast` | **OWASP ZAP** | Varredura da aplicação em execução, contra um banco efêmero |
+
+Todas são de código aberto.
+
+### Regras específicas do projeto
+
+As regras padrão das ferramentas não detectam os defeitos próprios desta base
+de código — por exemplo, o segredo de assinatura embutido não tem formato de
+credencial conhecida e passa despercebido por qualquer varredura genérica.
+Por isso há dois arquivos de configuração dedicados:
+
+- **`.security/gitleaks.toml`** — segredo de sessão embutido, string de conexão
+  com credenciais, senhas de seed e o padrão `process.env.X || "literal"`.
+- **`.security/semgrep-mediamais.yml`** — 10 regras, cada uma correspondente a
+  um defeito real encontrado na auditoria de risco: `$executeRawUnsafe`, HTML
+  interpolado injetado no DOM, extensão de arquivo controlada pelo cliente,
+  `<video autoPlay>` sem `muted`, `onDelete: Cascade` na tabela de comprovação
+  de veiculação, bloco `catch` vazio, entre outros.
+
+O objetivo dessas regras é impedir que esses defeitos voltem em alterações
+futuras. Ao corrigir um deles, a regra correspondente passa a proteger a
+correção.
+
+### Relatórios
+
+```
+security-reports/<timestamp>/   # saídas brutas por ferramenta (JSON/SARIF/HTML)
+security-reports/latest/        # link para a execução mais recente
+security-reports/latest/summary.md     # resumo consolidado legível
+security-reports/latest/summary.json   # resumo consolidado para automação
+```
+
+O diretório é ignorado pelo Git. O `semgrep.sarif` pode ser enviado a qualquer
+ferramenta de code scanning, e o SBOM sai em CycloneDX e SPDX.
+
+### Códigos de saída
+
+| Código | Significado |
+|--:|---|
+| `0` | Todas as etapas executaram e não houve achado no nível de reprovação |
+| `1` | Achados no nível de `--fail-on` ou acima (padrão: `high`) |
+| `2` | Uma etapa **falhou ao executar** — a varredura não aconteceu |
+| `3` | Alguma etapa foi pulada e `--require-all` estava ativo |
+
+O código `2` é intencionalmente distinto de `1`: ferramenta que não rodou nunca
+é tratada como aprovação. Pela mesma razão, a etapa de análise estática reprova
+quando algum arquivo não pôde ser analisado — cobertura parcial não é sucesso.
+
+Em automação, use `--require-all` para que etapa pulada também reprove.
+
+---
+
 ## Suporte
 
 Para dúvidas sobre a plataforma, parcerias ou suporte de Smart TVs:

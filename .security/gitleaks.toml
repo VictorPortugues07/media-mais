@@ -1,0 +1,79 @@
+# Configuracao do Gitleaks para a plataforma Media+
+#
+# As regras padrao do Gitleaks procuram credenciais com formato conhecido
+# (chaves AWS, tokens do GitHub, etc). Elas NAO detectam os segredos que
+# este projeto realmente embutiu no codigo, porque sao strings proprias sem
+# formato reconhecivel. As regras abaixo cobrem exatamente esses casos.
+
+title = "Media+ - regras de segredo"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Segredo de assinatura de sessao embutido no codigo
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "mediamais-auth-secret-literal"
+description = "Segredo de assinatura JWT da Media+ embutido no codigo"
+regex = '''(?i)mediamais[_-]?plataforma[_-]?secret[_-]?\d{2,4}[a-z_]*'''
+tags = ["mediamais", "jwt", "critico"]
+
+# ---------------------------------------------------------------------------
+# Padrao geral: variavel de ambiente sensivel com valor de reserva embutido.
+#
+# Esta e a causa raiz C2 da auditoria: com a reserva presente, a aplicacao
+# nao falha quando a variavel esta ausente - ela sobe usando o valor publico.
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "mediamais-env-fallback-secret"
+description = "Variavel de ambiente sensivel com valor de reserva embutido (process.env.X || \"literal\")"
+regex = '''process\.env\.(?:AUTH_SECRET|DATABASE_URL|DIRECT_URL|[A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|APIKEY|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*(?:\|\||\?\?)\s*["'`][^"'`\n]{6,}["'`]'''
+tags = ["mediamais", "fail-open", "critico"]
+
+# ---------------------------------------------------------------------------
+# String de conexao de banco com usuario e senha embutidos
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "mediamais-db-url-with-credentials"
+description = "String de conexao PostgreSQL com credenciais embutidas"
+regex = '''postgres(?:ql)?:\/\/[A-Za-z0-9._%+-]+:[^@\s"'`]{2,}@[A-Za-z0-9._-]+'''
+tags = ["mediamais", "banco", "critico"]
+
+# ---------------------------------------------------------------------------
+# Senhas de seed e de teste embutidas
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "mediamais-seed-password"
+description = "Senha padrao de seed embutida no codigo"
+regex = '''["'`](?:mediamais\d{3,4}|ponto\d{3}|anunciante\d{3}|admin123|senha123|root)["'`]'''
+tags = ["mediamais", "senha"]
+
+# ---------------------------------------------------------------------------
+# Allowlist
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Caminhos sem valor de auditoria de segredo"
+
+# Os caminhos sao comparados contra o caminho reportado pelo scanner, que
+# inclui o prefixo do ponto de montagem no container. Por isso os padroes
+# usam (^|/) em vez de ancorar apenas no inicio.
+paths = [
+  # Cache de build do Next commitado por engano no commit c1c4f89.
+  # Os achados ali sao hashes de manifesto, nao credenciais. O problema real
+  # (cache de build no historico, ~102 MiB) e um item de higiene de
+  # repositorio ja documentado na auditoria, e nao um segredo vazado.
+  # Sem esta excecao a etapa de segredos nunca ficaria verde, e um portao
+  # que nunca fica verde e um portao que as pessoas aprendem a ignorar.
+  '''(^|/)\.next/''',
+  '''(^|/)security-reports/''',
+  # Documentacao vendorizada de terceiros (skills do Prisma). Sao exemplos
+  # de documentacao publica, nao credenciais deste projeto.
+  '''(^|/)\.agents/skills/''',
+  '''(^|/)package-lock\.json$''',
+]
+
+regexes = [
+  # Placeholders obvios de documentacao
+  '''(?i)(seu[_-]?segredo|your[_-]?secret|change[_-]?me|xxxx+|<[a-z_]+>)''',
+]
