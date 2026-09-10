@@ -25,6 +25,7 @@ enum StatusAnuncio {
   ATIVO
   PAUSADO
   EXPIRADO
+  FILA_ESPERA
 }
 
 enum TipoMidia {
@@ -37,6 +38,7 @@ enum TipoNotificacao {
   ANUNCIO_APROVADO
   ANUNCIO_REJEITADO
   NOVO_ANUNCIO_TV
+  FILA_ESPERA
   PONTO_ATIVADO
   PONTO_DESATIVADO
   ALERTA
@@ -97,6 +99,8 @@ model PontoMidia {
   lat                  Float?
   lng                  Float?
   status               StatusPonto @default(PENDENTE)
+  aceitaNovosAnuncios  Boolean     @default(true) @map("aceita_novos_anuncios")
+  limiteTempoSegundos  Int         @default(360) @map("limite_tempo_segundos")
   ultimaAtividade      DateTime?   @map("ultima_atividade")
   tipoDispositivo      String?     @map("tipo_dispositivo")
   resolucaoTela        String?     @map("resolucao_tela")

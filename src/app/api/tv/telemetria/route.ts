@@ -54,8 +54,15 @@ export async function POST(request: NextRequest) {
       data: updateData,
     });
 
-    // 2. Se for uma exibição de anúncio finalizada, salvar registro
-    if (!data.heartbeatOnly && data.anuncioId && data.duracaoSegundos && data.tipoMidia) {
+    // 2. Se for uma exibição de anúncio finalizada, salvar registro (Proof of Play)
+    //    Ignora celulares/dispositivos móveis para garantir que apenas TVs/monitores gerem métricas válidas
+    if (
+      !data.heartbeatOnly &&
+      data.anuncioId &&
+      data.duracaoSegundos &&
+      data.tipoMidia &&
+      data.deviceType !== "MOBILE"
+    ) {
       await prisma.registroExibicao.create({
         data: {
           anuncioId: data.anuncioId,

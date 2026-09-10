@@ -16,6 +16,13 @@ interface PontoOption {
   categoria: string;
   cidade: string;
   uf: string;
+  aceitaNovosAnuncios: boolean;
+  tempoOcupadoSegundos: number;
+  tempoDisponivelSegundos: number;
+  limiteTempoSegundos: number;
+  porcentagemOcupada: number;
+  quantidadeFilaEspera: number;
+  proximaLiberacao?: string | null;
 }
 
 function NovoAnuncioForm() {
@@ -81,9 +88,9 @@ function NovoAnuncioForm() {
           window.URL.revokeObjectURL(tempVideo.src);
           const duration = Math.round(tempVideo.duration);
 
-          if (duration > 60) {
+          if (duration > 30) {
             setError(
-              `O vídeo selecionado tem ${duration}s de duração. O limite máximo permitido por anúncio é de 60 segundos.`
+              `O vídeo selecionado tem ${duration}s de duração. O limite máximo permitido por vídeo/anúncio é de 30 segundos.`
             );
             setFile(null);
             setPreviewUrl(null);
@@ -98,6 +105,7 @@ function NovoAnuncioForm() {
         };
       } else {
         setTipoMidia("IMAGEM");
+        setDuracaoSegundos(10);
         setFile(selectedFile);
         const objectUrl = URL.createObjectURL(selectedFile);
         setPreviewUrl(objectUrl);
@@ -116,6 +124,12 @@ function NovoAnuncioForm() {
     setError("");
   };
 
+  const selectedPonto = pontos.find((p) => String(p.id) === selectedPontoId);
+  const isPontoBloqueado = selectedPonto ? !selectedPonto.aceitaNovosAnuncios : false;
+  const loopLotado = selectedPonto
+    ? (selectedPonto.tempoOcupadoSegundos + duracaoSegundos) > (selectedPonto.limiteTempoSegundos || 360)
+    : false;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -126,6 +140,10 @@ function NovoAnuncioForm() {
     }
     if (!selectedPontoId) {
       setError("Por favor, selecione onde quer veicular o anúncio");
+      return;
+    }
+    if (isPontoBloqueado) {
+      setError("Este estabelecimento está temporariamente com solicitações pausadas pela moderação.");
       return;
     }
 
@@ -207,16 +225,85 @@ function NovoAnuncioForm() {
                 </div>
               )}
 
-              <Select
-                label="Ponto de TV para Veiculação"
-                required
-                options={pontos.map((p) => ({
-                  value: String(p.id),
-                  label: p.nomeEmpresa + " - " + p.categoria + " (" + p.cidade + "/" + p.uf + ")",
-                }))}
-                value={selectedPontoId}
-                onChange={(e) => setSelectedPontoId(e.target.value)}
-              />
+              <div>
+                <Select
+                  label="Ponto de TV para Veiculação"
+                  required
+                  options={pontos.map((p) => {
+                    const isBloq = !p.aceitaNovosAnuncios;
+                    const isLotado = p.tempoOcupadoSegundos >= (p.limiteTempoSegundos || 360);
+                    let tag = "";
+                    if (isBloq) tag = " [Solicitações Pausadas]";
+                    else if (isLotado) tag = ` [Fila de Espera: ${p.quantidadeFilaEspera} aguardando]`;
+                    else tag = ` [${(p.limiteTempoSegundos || 360) - p.tempoOcupadoSegundos}s livres]`;
+
+                    return {
+                      value: String(p.id),
+                      label: `${p.nomeEmpresa} - ${p.categoria} (${p.cidade}/${p.uf})${tag}`,
+                    };
+                  })}
+                  value={selectedPontoId}
+                  onChange={(e) => setSelectedPontoId(e.target.value)}
+                />
+
+                {/* Card Informativo de Capacidade e Fila do Ponto Selecionado */}
+                {selectedPonto && (
+                  <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="font-bold text-slate-700">
+                        Capacidade da TV (Loop de 6 minutos / 360s):
+                      </span>
+                      {isPontoBloqueado ? (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px]">
+                          ⛔ Novas Solicitações Pausadas
+                        </span>
+                      ) : loopLotado ? (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-extrabold text-[11px]">
+                          ⏳ Entrará na Fila de Espera
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">
+                          ✓ {selectedPonto.tempoDisponivelSegundos}s disponíveis para veiculação
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Barra de Progresso do Loop */}
+                    <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          selectedPonto.porcentagemOcupada >= 100
+                            ? "bg-amber-500"
+                            : selectedPonto.porcentagemOcupada > 75
+                            ? "bg-blue-600"
+                            : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${Math.min(100, selectedPonto.porcentagemOcupada)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>
+                        Tempo ocupado: <strong>{selectedPonto.tempoOcupadoSegundos}s</strong> de{" "}
+                        {selectedPonto.limiteTempoSegundos || 360}s ({selectedPonto.porcentagemOcupada}%)
+                      </span>
+                      <span>
+                        Fila de espera: <strong>{selectedPonto.quantidadeFilaEspera}</strong> na fila
+                      </span>
+                    </div>
+
+                    {isPontoBloqueado ? (
+                      <p className="text-[11px] text-rose-700 font-medium bg-rose-50 p-2 rounded-xl border border-rose-200">
+                        O administrador deste estabelecimento pausou temporariamente o recebimento de novas campanhas. Por favor, escolha outro ponto na lista.
+                      </p>
+                    ) : loopLotado ? (
+                      <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-xl border border-amber-200">
+                        A grade de 6 minutos está ocupada. Seu anúncio será aprovado pela moderação e colocado na <strong>Fila de Espera</strong>. Assim que uma empresa concluir a veiculação, seu anúncio começará a passar na TV automaticamente!
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
 
               <Input
                 label="Título do Anúncio / Campanha"
@@ -276,7 +363,7 @@ function NovoAnuncioForm() {
                       {file ? file.name : "Clique para selecionar seu vídeo ou imagem"}
                     </span>
                     <span className="text-xs text-slate-400 mt-1">
-                      Formatos aceitos: MP4, WebM, JPG, PNG (Máx 50MB)
+                      Formatos aceitos: MP4, WebM, JPG, PNG (Máx 30s para vídeos, máx 50MB)
                     </span>
                   </label>
                 </div>
@@ -285,7 +372,7 @@ function NovoAnuncioForm() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs">
                     <div className="flex items-center gap-2 truncate">
                       <span className="font-bold text-blue-900">
-                        {tipoMidia === "VIDEO" ? "🎬 Vídeo Selecionado:" : "🖼️ Imagem Selecionada:"}
+                        {tipoMidia === "VIDEO" ? `🎬 Vídeo Selecionado (${duracaoSegundos}s):` : "🖼️ Imagem Selecionada:"}
                       </span>
                       <span className="text-slate-700 font-semibold truncate">{file.name}</span>
                       <span className="text-slate-400 shrink-0">
@@ -332,8 +419,18 @@ function NovoAnuncioForm() {
                     Cancelar
                   </Button>
                 </Link>
-                <Button type="submit" size="lg" variant="gradient" loading={submitting}>
-                  Enviar para Moderação 🚀
+                <Button
+                  type="submit"
+                  size="lg"
+                  variant="gradient"
+                  loading={submitting}
+                  disabled={isPontoBloqueado}
+                >
+                  {isPontoBloqueado
+                    ? "Solicitações Bloqueadas"
+                    : loopLotado
+                    ? "Enviar para Fila de Espera ⏳"
+                    : "Enviar para Moderação 🚀"}
                 </Button>
               </div>
             </form>

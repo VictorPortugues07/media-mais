@@ -44,12 +44,60 @@ export async function GET(request: NextRequest) {
     where,
     include: {
       user: { select: { nome: true, email: true, avatarUrl: true } },
-      _count: { select: { anuncios: { where: { status: "ATIVO" } } } },
+      anuncios: {
+        where: { status: { in: ["ATIVO", "FILA_ESPERA"] } },
+        select: {
+          id: true,
+          status: true,
+          duracaoSegundos: true,
+          dataFim: true,
+        },
+      },
+      _count: {
+        select: {
+          anuncios: { where: { status: "ATIVO" } },
+        },
+      },
     },
     orderBy: { criadoEm: "desc" },
   });
 
-  return Response.json({ pontos });
+  const pontosComMetricas = pontos.map((p) => {
+    const ativos = p.anuncios.filter((a) => a.status === "ATIVO");
+    const fila = p.anuncios.filter((a) => a.status === "FILA_ESPERA");
+    const tempoOcupadoSegundos = ativos.reduce(
+      (acc, a) => acc + (a.duracaoSegundos || 10),
+      0
+    );
+    const limiteTempoSegundos = p.limiteTempoSegundos || 360;
+    const tempoDisponivelSegundos = Math.max(0, limiteTempoSegundos - tempoOcupadoSegundos);
+    const porcentagemOcupada = Math.min(
+      100,
+      Math.round((tempoOcupadoSegundos / limiteTempoSegundos) * 100)
+    );
+
+    // Encontrar data de término mais próxima entre anúncios ativos
+    const datasFim = ativos
+      .map((a) => a.dataFim)
+      .filter((d): d is Date => d !== null)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const proximaLiberacao = datasFim[0] || null;
+
+    // Remover lista de anúncios interna para resposta mais limpa
+    const { anuncios: _a, ...resto } = p;
+
+    return {
+      ...resto,
+      tempoOcupadoSegundos,
+      tempoDisponivelSegundos,
+      limiteTempoSegundos,
+      porcentagemOcupada,
+      quantidadeFilaEspera: fila.length,
+      proximaLiberacao,
+    };
+  });
+
+  return Response.json({ pontos: pontosComMetricas });
 }
 
 export async function POST(request: NextRequest) {

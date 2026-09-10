@@ -30,6 +30,8 @@ interface StatusPontoTv {
   status: string;
   online: boolean;
   ultimaAtividade: string | null;
+  tipoDispositivo?: string | null;
+  resolucaoTela?: string | null;
   anunciosAtivos: number;
   totalExibicoes: number;
 }
@@ -40,6 +42,7 @@ interface StatsData {
   totalAnuncios: number;
   anunciosPendentes: number;
   anunciosAtivos: number;
+  anunciosFilaEspera?: number;
   pontosAtivos: number;
   totalExibicoes: number;
   totalHorasExibidas: string;
@@ -273,10 +276,16 @@ export default function AdminDashboardPage() {
                       <TVStatusBadge ponto={tv} />
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
                       <span className="px-2 py-0.5 bg-slate-100 font-mono font-black text-slate-700 rounded-lg border border-slate-200">
                         {tv.codigoTv || "N/A"}
                       </span>
+                      {tv.tipoDispositivo && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-lg border border-blue-100 text-[10px]">
+                          {tv.tipoDispositivo === "SMART_TV" ? "📺 Smart TV" : tv.tipoDispositivo === "DESKTOP" ? "🖥️ Monitor / Totem" : tv.tipoDispositivo}
+                          {tv.resolucaoTela ? ` (${tv.resolucaoTela})` : ""}
+                        </span>
+                      )}
                       <span className="text-slate-400">
                         {tv.ultimaAtividade
                           ? new Date(tv.ultimaAtividade).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -385,6 +394,10 @@ export default function AdminDashboardPage() {
                             <Badge variant="success">Ativo</Badge>
                           ) : item.status === "PENDENTE" ? (
                             <Badge variant="warning">Pendente</Badge>
+                          ) : item.status === "FILA_ESPERA" ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              Fila de Espera
+                            </span>
                           ) : item.status === "REJEITADO" ? (
                             <Badge variant="danger">Rejeitado</Badge>
                           ) : (

@@ -52,6 +52,7 @@ export async function GET() {
     totalAnuncios,
     anunciosPendentes,
     anunciosAtivos,
+    anunciosFilaEspera,
     pontosAtivos,
     totalExibicoes,
     totalSegundosExibidos,
@@ -62,6 +63,7 @@ export async function GET() {
     prisma.anuncio.count(),
     prisma.anuncio.count({ where: { status: "PENDENTE" } }),
     prisma.anuncio.count({ where: { status: "ATIVO" } }),
+    prisma.anuncio.count({ where: { status: "FILA_ESPERA" } }),
     prisma.pontoMidia.count({ where: { status: "ATIVO" } }),
     prisma.registroExibicao.count(),
     prisma.registroExibicao.aggregate({
@@ -95,6 +97,8 @@ export async function GET() {
     online: boolean;
     emHorarioFuncionamento: boolean;
     ultimaAtividade: Date | null;
+    tipoDispositivo?: string | null;
+    resolucaoTela?: string | null;
     anunciosAtivos: number;
     totalExibicoes: number;
   }> = [];
@@ -119,6 +123,8 @@ export async function GET() {
           codigoTv: true,
           status: true,
           ultimaAtividade: true,
+          tipoDispositivo: true,
+          resolucaoTela: true,
           diasFuncionamento: true,
           horarioAbertura: true,
           horarioFechamento: true,
@@ -170,6 +176,8 @@ export async function GET() {
         online,
         emHorarioFuncionamento: emHorario,
         ultimaAtividade: p.ultimaAtividade,
+        tipoDispositivo: p.tipoDispositivo,
+        resolucaoTela: p.resolucaoTela,
         anunciosAtivos: p._count.anuncios,
         totalExibicoes: p._count.registroExibicoes,
       };
@@ -266,6 +274,7 @@ export async function GET() {
     totalAnuncios,
     anunciosPendentes,
     anunciosAtivos,
+    anunciosFilaEspera,
     pontosAtivos,
     totalExibicoes,
     totalHorasExibidas: ((totalSegundosExibidos._sum.duracaoSegundos || 0) / 3600).toFixed(1),

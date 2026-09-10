@@ -16,10 +16,20 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Se tentar acessar rota antiga /tv/[pontoId] sem autenticação, redireciona para o player oficial
+  // Rota direta /tv/[pontoId] é de uso exclusivo de administradores (preview).
+  // Qualquer outro usuário ou Smart TV deve obrigatoriamente usar /player com código de pareamento.
   if (pathname.startsWith("/tv/")) {
     const token = request.cookies.get("mm_session")?.value;
     if (!token) {
+      return NextResponse.redirect(new URL("/player", request.url));
+    }
+    try {
+      const { payload } = await jwtVerify(token, SECRET);
+      if (payload.role !== "ADMIN") {
+        return NextResponse.redirect(new URL("/player", request.url));
+      }
+      return NextResponse.next();
+    } catch {
       return NextResponse.redirect(new URL("/player", request.url));
     }
   }

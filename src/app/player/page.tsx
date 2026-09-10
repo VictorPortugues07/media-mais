@@ -43,26 +43,79 @@ export default function StandaloneTVPlayerPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Detectar tipo de dispositivo e resolucao
+  // Detectar tipo de dispositivo, hardware de Smart TV e resolução
   const getDeviceInfo = () => {
+    if (typeof window === "undefined") {
+      return {
+        deviceType: "SMART_TV" as const,
+        deviceLabel: "Smart TV",
+        screenResolution: "1920x1080",
+        isPortrait: false,
+        isMobile: false,
+        isTV: true,
+        userAgent: "",
+      };
+    }
+
     const ua = navigator.userAgent || "";
     const screenW = window.screen.width;
     const screenH = window.screen.height;
     const isPortrait = screenH > screenW;
-    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
-    const isSmartTV = /SmartTV|Smart-TV|SMART-TV|GoogleTV|Tizen|webOS|NetCast|BRAVIA|Roku|Fire TV|AppleTV|CrKey|AFTN|AFTM/i.test(ua);
 
-    let deviceType: "SMART_TV" | "DESKTOP" | "TABLET" | "MOBILE" = "DESKTOP";
-    if (isSmartTV) deviceType = "SMART_TV";
-    else if (isMobile) deviceType = "MOBILE";
-    else if (isTablet) deviceType = "TABLET";
+    // Detectar assinaturas nativas de Smart TVs
+    const isTizen = /Tizen|SMART-TV|Maple/i.test(ua);
+    const isWebOS = /webOS|Web0S|NetCast/i.test(ua);
+    const isAndroidTV = /GoogleTV|Android TV|MiTV|BRAVIA|AFTT|AFTM|Fire TV/i.test(ua);
+    const isRoku = /Roku/i.test(ua);
+    const isAppleTV = /AppleTV/i.test(ua);
+    const isGenericSmartTV = /SmartTV|Smart-TV|HbbTV|Vewd|Opera TV|CrKey/i.test(ua);
+
+    const isTV = isTizen || isWebOS || isAndroidTV || isRoku || isAppleTV || isGenericSmartTV;
+
+    // Detectar celulares e smartphones de mão
+    const isPhoneUA = /iPhone|iPod|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isTouchPhone = typeof navigator !== "undefined" && navigator.maxTouchPoints > 1 && (screenW < 900 || screenH < 900) && isPortrait;
+    const isMobile = (isPhoneUA || isTouchPhone) && !isTV;
+
+    let deviceType: "SMART_TV" | "DESKTOP" | "TABLET" | "MOBILE" = "SMART_TV";
+    let deviceLabel = "Smart TV";
+
+    if (isTizen) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Smart TV Samsung (Tizen)";
+    } else if (isWebOS) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Smart TV LG (webOS)";
+    } else if (isAndroidTV) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Android TV / Google TV";
+    } else if (isRoku) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Roku TV";
+    } else if (isAppleTV) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Apple TV";
+    } else if (isGenericSmartTV) {
+      deviceType = "SMART_TV";
+      deviceLabel = "Smart TV Integrada";
+    } else if (isMobile) {
+      deviceType = "MOBILE";
+      deviceLabel = "Smartphone / Celular";
+    } else if (/iPad|Android(?!.*Mobile)/i.test(ua) || (navigator.maxTouchPoints > 1 && screenW >= 768)) {
+      deviceType = "TABLET";
+      deviceLabel = "Tablet Comercial";
+    } else {
+      deviceType = "DESKTOP";
+      deviceLabel = "Totem / Mini PC (1080p)";
+    }
 
     return {
       deviceType,
+      deviceLabel,
       screenResolution: `${screenW}x${screenH}`,
       isPortrait,
-      isMobile: isMobile && !isTablet,
+      isMobile,
+      isTV,
       userAgent: ua.substring(0, 200),
     };
   };
@@ -95,15 +148,21 @@ export default function StandaloneTVPlayerPage() {
     };
   }, []);
 
-  // Detectar dispositivo mobile na inicializacao
+  // Detectar dispositivo e ativar Wake Lock para manter a TV sempre ligada
   useEffect(() => {
     const info = getDeviceInfo();
-    // Bloquear se for mobile (celular, nao tablet)
-    // Tela pequena em retrato e com user agent de celular
-    if (info.isMobile && info.isPortrait && window.screen.width < 768) {
+    // Bloquear se for dispositivo mobile (celular/smartphone em modo retrato ou tela pequena)
+    if (info.isMobile || (info.isPortrait && !info.isTV)) {
       setIsMobileDevice(true);
     }
     setLoading(false);
+
+    // Screen Wake Lock API para evitar descanso de tela na TV
+    if (typeof navigator !== "undefined" && "wakeLock" in navigator && !info.isMobile) {
+      try {
+        (navigator as any).wakeLock?.request("screen").catch(() => {});
+      } catch {}
+    }
   }, []);
 
   // 2. Conectar à API com o código rotativo
@@ -211,6 +270,9 @@ export default function StandaloneTVPlayerPage() {
     if (!ponto?.id) return;
     try {
       const deviceInfo = getDeviceInfo();
+      // Não registrar Proof-of-Play se for celular/dispositivo móvel não autorizado
+      if (deviceInfo.isMobile) return;
+
       await fetch("/api/tv/telemetria", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -220,6 +282,7 @@ export default function StandaloneTVPlayerPage() {
           duracaoSegundos: ad.duracaoSegundos || 10,
           tipoMidia: ad.tipoMidia,
           deviceType: deviceInfo.deviceType,
+          deviceLabel: deviceInfo.deviceLabel,
           screenResolution: deviceInfo.screenResolution,
         }),
       });

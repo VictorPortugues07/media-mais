@@ -18,16 +18,22 @@ export async function GET(
     include: {
       user: { select: { nome: true, email: true } },
       anuncios: {
-        where: { status: "ATIVO" },
+        where: { status: { in: ["ATIVO", "FILA_ESPERA"] } },
         select: {
           id: true,
           titulo: true,
           tipoMidia: true,
+          midiaUrl: true,
+          duracaoSegundos: true,
           status: true,
+          dataInicio: true,
+          dataFim: true,
+          criadoEm: true,
           anunciante: {
-            select: { nomeEmpresa: true },
+            select: { nomeEmpresa: true, categoria: true },
           },
         },
+        orderBy: { criadoEm: "asc" },
       },
     },
   });
@@ -36,7 +42,29 @@ export async function GET(
     return Response.json({ error: "Ponto nao encontrado" }, { status: 404 });
   }
 
-  return Response.json({ ponto });
+  const ativos = ponto.anuncios.filter((a) => a.status === "ATIVO");
+  const filaEspera = ponto.anuncios.filter((a) => a.status === "FILA_ESPERA");
+  const tempoOcupadoSegundos = ativos.reduce(
+    (acc, a) => acc + (a.duracaoSegundos || 10),
+    0
+  );
+  const limiteTempoSegundos = ponto.limiteTempoSegundos || 360;
+  const tempoDisponivelSegundos = Math.max(0, limiteTempoSegundos - tempoOcupadoSegundos);
+
+  return Response.json({
+    ponto: {
+      ...ponto,
+      anunciosAtivos: ativos,
+      anunciosFilaEspera: filaEspera,
+      tempoOcupadoSegundos,
+      tempoDisponivelSegundos,
+      limiteTempoSegundos,
+      porcentagemOcupada: Math.min(
+        100,
+        Math.round((tempoOcupadoSegundos / limiteTempoSegundos) * 100)
+      ),
+    },
+  });
 }
 
 export async function PATCH(
@@ -53,9 +81,16 @@ export async function PATCH(
     const pontoId = parseInt(id);
     const body = await request.json();
 
+    const dataToUpdate: Record<string, unknown> = {};
+    if (body.status !== undefined) dataToUpdate.status = body.status;
+    if (body.aceitaNovosAnuncios !== undefined)
+      dataToUpdate.aceitaNovosAnuncios = Boolean(body.aceitaNovosAnuncios);
+    if (body.limiteTempoSegundos !== undefined)
+      dataToUpdate.limiteTempoSegundos = Number(body.limiteTempoSegundos);
+
     const ponto = await prisma.pontoMidia.update({
       where: { id: pontoId },
-      data: { status: body.status },
+      data: dataToUpdate,
     });
 
     return Response.json({ ponto });

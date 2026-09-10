@@ -23,6 +23,8 @@ const telemetrySchema = z.object({
   duracaoSegundos: z.number().optional(),
   tipoMidia: z.enum(["VIDEO", "IMAGEM"]).optional(),
   heartbeatOnly: z.boolean().optional(),
+  deviceType: z.enum(["SMART_TV", "DESKTOP", "TABLET", "MOBILE"]).optional(),
+  screenResolution: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -30,16 +32,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = telemetrySchema.parse(body);
 
+    const updateData: Record<string, unknown> = {
+      ultimaAtividade: new Date(),
+    };
+    if (data.deviceType) updateData.tipoDispositivo = data.deviceType;
+    if (data.screenResolution) updateData.resolucaoTela = data.screenResolution;
+
     // 1. Atualizar timestamp de atividade da TV
     await prisma.pontoMidia.update({
       where: { id: data.pontoId },
-      data: {
-        ultimaAtividade: new Date(),
-      },
+      data: updateData,
     });
 
-    // 2. Se for finalização de anúncio, registrar no Proof of Play
-    if (!data.heartbeatOnly && data.anuncioId && data.duracaoSegundos && data.tipoMidia) {
+    // 2. Se for finalização de anúncio, registrar no Proof of Play (ignora celulares)
+    if (
+      !data.heartbeatOnly &&
+      data.anuncioId &&
+      data.duracaoSegundos &&
+      data.tipoMidia &&
+      data.deviceType !== "MOBILE"
+    ) {
       await prisma.registroExibicao.create({
         data: {
           anuncioId: data.anuncioId,

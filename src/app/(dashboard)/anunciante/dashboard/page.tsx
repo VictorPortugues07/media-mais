@@ -25,7 +25,8 @@ interface AnuncioItem {
   tipoMidia: "VIDEO" | "IMAGEM";
   midiaUrl: string;
   duracaoSegundos: number;
-  status: "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO";
+  status: "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO" | "FILA_ESPERA";
+  posicaoFila?: number | null;
   motivoRejeicao?: string;
   criadoEm: string;
   totalExibicoes?: number;
@@ -41,7 +42,15 @@ interface AnuncioItem {
   };
 }
 
-function StatusPill({ status, tvOnline }: { status: string; tvOnline?: boolean }) {
+function StatusPill({
+  status,
+  tvOnline,
+  posicaoFila,
+}: {
+  status: string;
+  tvOnline?: boolean;
+  posicaoFila?: number | null;
+}) {
   if (status === "ATIVO" && tvOnline) {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -55,6 +64,14 @@ function StatusPill({ status, tvOnline }: { status: string; tvOnline?: boolean }
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
         <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
         Ativo
+      </span>
+    );
+  }
+  if (status === "FILA_ESPERA") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        Fila de Espera {posicaoFila ? `#${posicaoFila}` : ""}
       </span>
     );
   }
@@ -138,6 +155,7 @@ export default function AnuncianteDashboard() {
 
   const ativos = anuncios.filter((a) => a.status === "ATIVO");
   const pendentes = anuncios.filter((a) => a.status === "PENDENTE");
+  const naFila = anuncios.filter((a) => a.status === "FILA_ESPERA");
   const rejeitados = anuncios.filter((a) => a.status === "REJEITADO");
   const totalExibicoes = anuncios.reduce((sum, a) => sum + (a.totalExibicoes ?? 0), 0);
 
@@ -170,12 +188,12 @@ export default function AnuncianteDashboard() {
               icon: "📺", color: "text-blue-600", bg: "bg-blue-50", ring: "ring-blue-100",
             },
             {
-              label: "Em Moderação", value: pendentes.length, sub: "aguardando aprovação",
+              label: "Fila de Espera", value: naFila.length, sub: "aguardando vagas",
               icon: "⏳", color: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-100",
             },
             {
-              label: "Rejeitados", value: rejeitados.length, sub: "precisam de revisão",
-              icon: "⚠️", color: "text-rose-600", bg: "bg-rose-50", ring: "ring-rose-100",
+              label: "Em Moderação", value: pendentes.length, sub: "em análise pela equipe",
+              icon: "📋", color: "text-indigo-600", bg: "bg-indigo-50", ring: "ring-indigo-100",
             },
             {
               label: "Total Exibições", value: totalExibicoes.toLocaleString("pt-BR"), sub: "reproduções acumuladas",
@@ -262,7 +280,11 @@ export default function AnuncianteDashboard() {
                         >
                           {anuncio.titulo}
                         </button>
-                        <StatusPill status={anuncio.status} tvOnline={anuncio.pontoMidia.tvOnline} />
+                        <StatusPill
+                          status={anuncio.status}
+                          tvOnline={anuncio.pontoMidia.tvOnline}
+                          posicaoFila={anuncio.posicaoFila}
+                        />
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5 truncate">
                         {anuncio.pontoMidia.nomeEmpresa} · {anuncio.pontoMidia.cidade}/{anuncio.pontoMidia.uf}

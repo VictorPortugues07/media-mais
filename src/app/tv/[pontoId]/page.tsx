@@ -133,10 +133,18 @@ export default function TVPlayerPage({
         <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center text-2xl mb-4 font-black">
           !
         </div>
-        <h2 className="text-2xl font-bold font-heading">Transmissão Indisponível</h2>
+        <h2 className="text-2xl font-bold font-heading">Acesso Direto Restrito</h2>
         <p className="text-sm text-blue-200/80 mt-2 max-w-md">{error}</p>
+        <div className="mt-6">
+          <a
+            href="/player"
+            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:from-blue-500 hover:to-indigo-500 transition"
+          >
+            Acessar Reprodutor da TV (/player) →
+          </a>
+        </div>
         <p className="text-xs text-blue-300/50 mt-6">
-          Verifique se o ponto está ativo no painel administrativo.
+          Para conectar Smart TVs ou telas, utilize o código de pareamento de 6 dígitos gerado no painel.
         </p>
       </div>
     );

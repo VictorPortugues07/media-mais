@@ -15,7 +15,7 @@ interface AnuncioDetail {
   tipoMidia: "VIDEO" | "IMAGEM";
   midiaUrl: string;
   duracaoSegundos: number;
-  status: "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO";
+  status: "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO" | "FILA_ESPERA";
   totalExibicoes?: number;
   pontoMidia: { nomeEmpresa: string; cidade: string; uf: string };
   criadoEm: string;
@@ -257,9 +257,15 @@ export default function AdminAnunciantesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-slate-900 text-xs truncate">{ad.titulo}</p>
-                      <Badge variant={ad.status === "ATIVO" ? "success" : ad.status === "PENDENTE" ? "warning" : "default"}>
-                        {ad.status}
-                      </Badge>
+                      {ad.status === "FILA_ESPERA" ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          Fila de Espera
+                        </span>
+                      ) : (
+                        <Badge variant={ad.status === "ATIVO" ? "success" : ad.status === "PENDENTE" ? "warning" : "default"}>
+                          {ad.status}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                       TV: {ad.pontoMidia.nomeEmpresa} ({ad.pontoMidia.cidade}/{ad.pontoMidia.uf}) · {ad.duracaoSegundos}s

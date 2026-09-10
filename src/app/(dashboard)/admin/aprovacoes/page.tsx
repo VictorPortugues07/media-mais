@@ -16,7 +16,8 @@ interface AnuncioPendente {
   tipoMidia: "VIDEO" | "IMAGEM";
   midiaUrl: string;
   duracaoSegundos: number;
-  status: "PENDENTE" | "ATIVO" | "REJEITADO";
+  status: "PENDENTE" | "ATIVO" | "REJEITADO" | "FILA_ESPERA";
+  posicaoFila?: number | null;
   criadoEm: string;
   anunciante: {
     nomeEmpresa: string;
@@ -36,6 +37,7 @@ export default function AdminAprovacoesPage() {
   const [anuncios, setAnuncios] = useState<AnuncioPendente[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"PENDENTES" | "FILA_ESPERA">("PENDENTES");
 
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -43,24 +45,28 @@ export default function AdminAprovacoesPage() {
   const [adToDelete, setAdToDelete] = useState<AnuncioPendente | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [selectedAdId, setSelectedAdId] = useState<number | null>(null);
+  const [diasValidade, setDiasValidade] = useState<number>(30);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadAnuncios = async () => {
     try {
-      const [userRes, anunciosRes] = await Promise.all([
+      const [userRes, pendentesRes, filaRes] = await Promise.all([
         fetch("/api/auth/me"),
         fetch("/api/anuncios?status=PENDENTE"),
+        fetch("/api/anuncios?status=FILA_ESPERA"),
       ]);
 
       if (userRes.ok) {
         const u = await userRes.json();
         setUser(u.user);
       }
-      if (anunciosRes.ok) {
-        const a = await anunciosRes.json();
-        setAnuncios(a.anuncios || []);
-      }
+
+      const pData = pendentesRes.ok ? await pendentesRes.json() : { anuncios: [] };
+      const fData = filaRes.ok ? await filaRes.json() : { anuncios: [] };
+
+      setAnuncios([...(pData.anuncios || []), ...(fData.anuncios || [])]);
     } catch (err) {
       console.error("Load pendentes error:", err);
     } finally {
@@ -72,19 +78,60 @@ export default function AdminAprovacoesPage() {
     loadAnuncios();
   }, []);
 
-  const handleAprovar = async (id: number) => {
+  const handleAprovar = async (id: number, force = false) => {
     setActionLoading(id);
+    setApproveError(null);
     try {
-      const res = await fetch(`/api/anuncios/${id}/aprovar`, { method: "PATCH" });
-      if (res.ok) {
-        setAnuncios((prev) => prev.filter((a) => a.id !== id));
-        setApproveModalOpen(false);
-        setSelectedAdId(null);
-        setToastMessage("Campanha aprovada e liberada na TV com sucesso!");
-        setTimeout(() => setToastMessage(null), 4000);
+      const res = await fetch(`/api/anuncios/${id}/aprovar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diasValidade, force }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.code === "CAPACIDADE_EXCEDIDA") {
+          setApproveError(data.error);
+          return;
+        }
+        throw new Error(data.error || "Erro ao aprovar anúncio");
       }
-    } catch (err) {
-      console.error("Aprovar error:", err);
+
+      setAnuncios((prev) => prev.filter((a) => a.id !== id));
+      setApproveModalOpen(false);
+      setSelectedAdId(null);
+      setToastMessage("Campanha aprovada e liberada na TV com sucesso!");
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao aprovar";
+      setApproveError(msg);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMoverParaFila = async (id: number) => {
+    setActionLoading(id);
+    setApproveError(null);
+    try {
+      const res = await fetch(`/api/anuncios/${id}/aprovar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "FILA_ESPERA" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao mover para a fila");
+
+      setAnuncios((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "FILA_ESPERA" as const } : a))
+      );
+      setApproveModalOpen(false);
+      setSelectedAdId(null);
+      setToastMessage("Anúncio movido para a Fila de Espera com sucesso!");
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao mover para a fila";
+      setApproveError(msg);
     } finally {
       setActionLoading(null);
     }
@@ -92,6 +139,8 @@ export default function AdminAprovacoesPage() {
 
   const handleOpenApprove = (id: number) => {
     setSelectedAdId(id);
+    setDiasValidade(30);
+    setApproveError(null);
     setApproveModalOpen(true);
   };
 
@@ -163,39 +212,92 @@ export default function AdminAprovacoesPage() {
     );
   }
 
+  const pendentesList = anuncios.filter((a) => a.status === "PENDENTE");
+  const filaList = anuncios.filter((a) => a.status === "FILA_ESPERA");
+  const currentList = activeTab === "PENDENTES" ? pendentesList : filaList;
+
   return (
     <DashboardLayout
       role="ADMIN"
       userName={user?.nome || "Administrador"}
       userEmail={user?.email || ""}
-      title="Fila de Moderação e Aprovação"
-      description="Revise peças de mídia antes de liberá-las para os televisores"
+      title="Fila de Moderação e Auditoria"
+      description="Revise peças de mídia antes de liberá-las para os televisores ou organize a fila de espera"
     >
       <div className="space-y-6">
+        {/* Abas de Navegação */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("PENDENTES")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+              activeTab === "PENDENTES"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>📋 Moderação Pendente</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === "PENDENTES" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+            }`}>
+              {pendentesList.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("FILA_ESPERA")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+              activeTab === "FILA_ESPERA"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <span>⏳ Fila de Espera dos Pontos</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === "FILA_ESPERA" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+            }`}>
+              {filaList.length}
+            </span>
+          </button>
+        </div>
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 font-heading">
-                  Campanhas Pendentes ({anuncios.length})
+                  {activeTab === "PENDENTES"
+                    ? `Campanhas Aguardando Avaliação (${pendentesList.length})`
+                    : `Empresas na Fila de Espera (${filaList.length})`}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Ao aprovar, a TV começará a exibir a peça imediatamente e ambos os usuários serão notificados.
+                  {activeTab === "PENDENTES"
+                    ? "Valide o conteúdo antes de liberar na grade de 6 minutos da TV."
+                    : "Empresas aguardando abertura de novas vagas nos estabelecimentos selecionados."}
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardBody className="p-0">
-            {anuncios.length === 0 ? (
+            {currentList.length === 0 ? (
               <div className="p-12">
                 <EmptyState
-                  title="Fila de aprovação vazia! 🎉"
-                  description="Todas as peças enviadas já foram moderadas e estão ativas na rede."
+                  title={
+                    activeTab === "PENDENTES"
+                      ? "Fila de aprovação zerada! 🎉"
+                      : "Nenhuma empresa na fila de espera no momento."
+                  }
+                  description={
+                    activeTab === "PENDENTES"
+                      ? "Todas as peças enviadas já foram moderadas pela equipe."
+                      : "Todas as solicitações de anúncios estão acomodadas ou já foram avaliadas."
+                  }
                 />
               </div>
             ) : (
               <div className="divide-y divide-slate-200">
-                {anuncios.map((anuncio) => (
+                {currentList.map((anuncio, idx) => (
                   <div
                     key={anuncio.id}
                     className="p-6 flex flex-col lg:flex-row gap-6 hover:bg-slate-50/50 transition"
@@ -218,6 +320,11 @@ export default function AdminAprovacoesPage() {
                         <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg backdrop-blur-xs">
                           {anuncio.tipoMidia} • {anuncio.duracaoSegundos}s
                         </span>
+                        {anuncio.status === "FILA_ESPERA" && (
+                          <span className="absolute bottom-2 left-2 bg-amber-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-xs">
+                            Fila #{anuncio.posicaoFila || idx + 1}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -227,7 +334,9 @@ export default function AdminAprovacoesPage() {
                           <h4 className="text-base font-bold text-slate-900 font-heading">
                             {anuncio.titulo}
                           </h4>
-                          <Badge variant="warning">Aguardando Avaliação</Badge>
+                          <Badge variant={anuncio.status === "FILA_ESPERA" ? "warning" : "default"}>
+                            {anuncio.status === "FILA_ESPERA" ? "Fila de Espera" : "Aguardando Moderação"}
+                          </Badge>
                         </div>
 
                         <p className="text-xs text-slate-600 mt-2 leading-relaxed">
@@ -258,7 +367,7 @@ export default function AdminAprovacoesPage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 flex items-center gap-3">
+                      <div className="mt-6 flex items-center gap-3 flex-wrap">
                         <Button
                           variant="success"
                           size="md"
@@ -268,8 +377,19 @@ export default function AdminAprovacoesPage() {
                           <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          Aprovar e Liberar na TV
+                          {anuncio.status === "FILA_ESPERA" ? "Liberar na TV Agora" : "Aprovar e Liberar na TV"}
                         </Button>
+
+                        {anuncio.status === "PENDENTE" && (
+                          <Button
+                            variant="secondary"
+                            size="md"
+                            disabled={actionLoading === anuncio.id}
+                            onClick={() => handleMoverParaFila(anuncio.id)}
+                          >
+                            ⏳ Mover para Fila
+                          </Button>
+                        )}
 
                         <Button
                           variant="danger"
@@ -302,17 +422,62 @@ export default function AdminAprovacoesPage() {
         </Card>
       </div>
 
+      {/* Modal de Aprovação com Definição de Período da Campanha */}
       <Modal
         isOpen={approveModalOpen}
         onClose={() => setApproveModalOpen(false)}
-        title="Confirmar Aprovação"
-        description="Esta ação é irreversível. Após aprovada, a campanha será exibida na TV imediatamente."
+        title="Confirmar Aprovação da Campanha"
+        description="Defina o período de veiculação na grade de 6 minutos da TV."
       >
         <div className="space-y-4">
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
-            A campanha será liberada para transmissão na TV de destino. Anunciante e dono da tela serão notificados.
+          {approveError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-800 space-y-2">
+              <p>{approveError}</p>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => selectedAdId && handleMoverParaFila(selectedAdId)}
+                >
+                  Mover para Fila de Espera
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => selectedAdId && handleAprovar(selectedAdId, true)}
+                >
+                  Forçar Inclusão na Grade
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 leading-relaxed">
+            Ao aprovar, a peça entrará no loop de exibição da TV imediatamente. Anunciante e dono da tela serão notificados.
           </div>
-          <div className="flex items-center justify-end gap-2 pt-1">
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              Tempo de Contrato / Veiculação da Campanha
+            </label>
+            <select
+              value={diasValidade}
+              onChange={(e) => setDiasValidade(Number(e.target.value))}
+              className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-800 bg-white outline-none focus:border-blue-500 transition"
+            >
+              <option value={15}>15 dias (Campanha curta)</option>
+              <option value={30}>30 dias / 1 mês (Padrão)</option>
+              <option value={60}>60 dias / 2 meses</option>
+              <option value={90}>90 dias / 3 meses (Trimestral)</option>
+              <option value={180}>180 dias / 6 meses (Semestral)</option>
+              <option value={365}>365 dias / 1 ano (Anual)</option>
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              O sistema registrará a data de término prevista para organizar a entrada de novas empresas na fila de espera.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="ghost" onClick={() => setApproveModalOpen(false)}>
               Cancelar
             </Button>
@@ -321,7 +486,7 @@ export default function AdminAprovacoesPage() {
               loading={actionLoading === selectedAdId}
               onClick={() => selectedAdId && handleAprovar(selectedAdId)}
             >
-              Confirmar Aprovação
+              Confirmar e Liberar na TV
             </Button>
           </div>
         </div>

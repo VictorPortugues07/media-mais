@@ -16,7 +16,7 @@ interface AnuncioPonto {
   tipoMidia: "VIDEO" | "IMAGEM";
   midiaUrl: string;
   duracaoSegundos: number;
-  status: "ATIVO" | "PENDENTE" | "PAUSADO" | "REJEITADO";
+  status: "ATIVO" | "PENDENTE" | "PAUSADO" | "REJEITADO" | "FILA_ESPERA";
   criadoEm: string;
   totalExibicoes?: number;
   exibicoesHoje?: number;
@@ -27,11 +27,12 @@ interface AnuncioPonto {
 
 function statusConfig(status: string) {
   switch (status) {
-    case "ATIVO":    return { variant: "success" as const, label: "Ativo na TV" };
-    case "PAUSADO":  return { variant: "default" as const, label: "Pausado" };
-    case "PENDENTE": return { variant: "warning" as const, label: "Em Moderação" };
-    case "REJEITADO":return { variant: "danger" as const,  label: "Rejeitado" };
-    default:         return { variant: "default" as const, label: status };
+    case "ATIVO":       return { variant: "success" as const, label: "Ativo na TV" };
+    case "PAUSADO":     return { variant: "default" as const, label: "Pausado" };
+    case "FILA_ESPERA": return { variant: "warning" as const, label: "Fila de Espera" };
+    case "PENDENTE":    return { variant: "warning" as const, label: "Em Moderação" };
+    case "REJEITADO":   return { variant: "danger" as const,  label: "Rejeitado" };
+    default:            return { variant: "default" as const, label: status };
   }
 }
 

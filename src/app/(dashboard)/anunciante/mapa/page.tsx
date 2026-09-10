@@ -163,6 +163,32 @@ export default function AnuncianteMapaPage() {
                   </div>
                 )}
 
+                {/* Indicador de Capacidade do Loop e Fila */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700">Loop da TV (Máx 6 min):</span>
+                    {selectedPonto.aceitaNovosAnuncios === false ? (
+                      <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[10px]">
+                        ⛔ Solicitações Pausadas
+                      </span>
+                    ) : (selectedPonto.tempoOcupadoSegundos || 0) >= (selectedPonto.limiteTempoSegundos || 360) ? (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-extrabold text-[10px]">
+                        ⏳ Fila de Espera ({selectedPonto.quantidadeFilaEspera || 0})
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[10px]">
+                        ✓ {selectedPonto.tempoDisponivelSegundos || 360}s disponíveis
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, selectedPonto.porcentagemOcupada || 0)}%` }}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <p className="text-[10px] uppercase font-bold text-slate-400">
@@ -205,8 +231,17 @@ export default function AnuncianteMapaPage() {
                     href={`/anunciante/anuncios/novo?pontoId=${selectedPonto.id}`}
                     className="block w-full"
                   >
-                    <Button size="lg" variant="gradient" className="w-full">
-                      Anunciar nesta TV 🚀
+                    <Button
+                      size="lg"
+                      variant={selectedPonto.aceitaNovosAnuncios === false ? "secondary" : "gradient"}
+                      className="w-full"
+                      disabled={selectedPonto.aceitaNovosAnuncios === false}
+                    >
+                      {selectedPonto.aceitaNovosAnuncios === false
+                        ? "Solicitações Bloqueadas"
+                        : (selectedPonto.tempoOcupadoSegundos || 0) >= (selectedPonto.limiteTempoSegundos || 360)
+                        ? "Entrar na Fila de Espera ⏳"
+                        : "Anunciar nesta TV 🚀"}
                     </Button>
                   </Link>
                 </div>
