@@ -369,14 +369,20 @@ export default function PontoDashboard() {
         {/* ── Playlist atual ───────────────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-900 font-heading">Grade de Transmissão</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Anúncios em loop contínuo na sua TV agora</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Anúncios em loop contínuo na sua TV · Loop:{" "}
+                  <strong>
+                    {anuncios.reduce((acc, a) => acc + (a.duracaoSegundos || 10), 0)}s de 360s (6 min)
+                  </strong>
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={anuncios.length > 0 ? "success" : "default"}>
-                  {anuncios.length} no ar
+                  {anuncios.length} no ar (
+                  {anuncios.reduce((acc, a) => acc + (a.duracaoSegundos || 10), 0)}s)
                 </Badge>
                 <Link href="/ponto/anuncios">
                   <button className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition px-2 py-1 rounded-lg hover:bg-blue-50 cursor-pointer">

@@ -9,7 +9,7 @@ const anuncioSchema = z.object({
   descricao: z.string().min(10, "Descricao deve ter no minimo 10 caracteres"),
   tipoMidia: z.enum(["VIDEO", "IMAGEM"]),
   midiaUrl: z.string().min(1, "Midia obrigatoria"),
-  duracaoSegundos: z.number().min(5).max(60).optional(),
+  duracaoSegundos: z.number().min(5, "Duração mínima é de 5 segundos").max(30, "Duração máxima permitida por vídeo/anúncio é de 30 segundos").optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -102,12 +102,26 @@ export async function GET(request: NextRequest) {
       const totalSegundos = totalExibicoes * a.duracaoSegundos;
       const totalMinutos = Math.round(totalSegundos / 60);
 
+      // Se estiver na fila de espera, calcular a posição na fila daquele ponto
+      let posicaoFila: number | null = null;
+      if (a.status === "FILA_ESPERA") {
+        const anterioresNaFila = await prisma.anuncio.count({
+          where: {
+            pontoMidiaId: a.pontoMidiaId,
+            status: "FILA_ESPERA",
+            criadoEm: { lt: a.criadoEm },
+          },
+        });
+        posicaoFila = anterioresNaFila + 1;
+      }
+
       return {
         ...a,
         totalExibicoes,
         exibicoesHoje,
         totalMinutosExibidos: totalMinutos,
         ultimaExibicao: ultimaExibicao?.exibidoEm || null,
+        posicaoFila,
         pontoMidia: {
           ...a.pontoMidia,
           tvOnline: isOnline,
@@ -147,34 +161,106 @@ export async function POST(request: NextRequest) {
 
     if (!ponto || ponto.status !== "ATIVO") {
       return Response.json(
-        { error: "Ponto de midia nao encontrado ou inativo" },
+        { error: "Ponto de mídia não encontrado ou inativo" },
         { status: 400 }
       );
     }
 
+    // 1. Verificar se o admin bloqueou novas solicitações para este ponto
+    if (!ponto.aceitaNovosAnuncios) {
+      return Response.json(
+        {
+          error:
+            "As solicitações de anúncio para este ponto estão temporariamente suspensas pela administração.",
+          bloqueado: true,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Calcular tempo ocupado pelos anúncios ATIVOS (loop de 6 minutos / limiteTempoSegundos)
+    const anunciosAtivos = await prisma.anuncio.findMany({
+      where: {
+        pontoMidiaId: ponto.id,
+        status: "ATIVO",
+      },
+      select: { duracaoSegundos: true },
+    });
+
+    const tempoOcupadoAtual = anunciosAtivos.reduce(
+      (sum, item) => sum + (item.duracaoSegundos || 10),
+      0
+    );
+    const limiteLoop = ponto.limiteTempoSegundos || 360;
+    const duracaoDesejada = data.duracaoSegundos || (data.tipoMidia === "VIDEO" ? 15 : 10);
+
+    // Se ultrapassar o tempo limite do loop (6 min = 360s), entra na FILA_ESPERA
+    const vaiParaFilaEspera = tempoOcupadoAtual + duracaoDesejada > limiteLoop;
+    const statusInicial = vaiParaFilaEspera ? "FILA_ESPERA" : "PENDENTE";
+
     const anuncio = await prisma.anuncio.create({
       data: {
         ...data,
-        duracaoSegundos: data.duracaoSegundos || 10,
+        duracaoSegundos: duracaoDesejada,
         anuncianteId: anunciante.id,
+        status: statusInicial,
       },
     });
 
-    // Notify admins
+    // 3. Notificações
     const admins = await prisma.user.findMany({
       where: { role: "ADMIN" },
     });
 
-    await prisma.notificacao.createMany({
-      data: admins.map((admin) => ({
-        userId: admin.id,
-        tipo: "ANUNCIO_PENDENTE" as const,
-        titulo: "Novo anuncio para aprovacao",
-        mensagem: `"${data.titulo}" de ${anunciante.nomeEmpresa} para ${ponto.nomeEmpresa}`,
-      })),
-    });
+    if (vaiParaFilaEspera) {
+      // Contar posição na fila
+      const totalNaFila = await prisma.anuncio.count({
+        where: { pontoMidiaId: ponto.id, status: "FILA_ESPERA" },
+      });
 
-    return Response.json({ anuncio }, { status: 201 });
+      // Notificar anunciante sobre a fila de espera
+      await prisma.notificacao.create({
+        data: {
+          userId: session.userId,
+          tipo: "FILA_ESPERA",
+          titulo: "Anúncio na Fila de Espera",
+          mensagem: `A grade da TV "${ponto.nomeEmpresa}" está com a capacidade de 6 minutos preenchida (${tempoOcupadoAtual}s ocupados). Seu anúncio "${data.titulo}" entrou na fila de espera (Posição #${totalNaFila}) e será ativado assim que uma vaga abrir!`,
+        },
+      });
+
+      // Notificar administradores sem sobrecarregar com alerta simples
+      await prisma.notificacao.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          tipo: "FILA_ESPERA" as const,
+          titulo: "Novo anúncio na Fila de Espera",
+          mensagem: `"${data.titulo}" de ${anunciante.nomeEmpresa} entrou na fila de espera de ${ponto.nomeEmpresa} (Grade cheia: ${tempoOcupadoAtual}s/${limiteLoop}s).`,
+        })),
+      });
+    } else {
+      // Notificar administradores para moderação padrão
+      await prisma.notificacao.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          tipo: "ANUNCIO_PENDENTE" as const,
+          titulo: "Novo anúncio para moderação",
+          mensagem: `"${data.titulo}" de ${anunciante.nomeEmpresa} para ${ponto.nomeEmpresa} (${duracaoDesejada}s)`,
+        })),
+      });
+    }
+
+    return Response.json(
+      {
+        anuncio,
+        vaiParaFilaEspera,
+        tempoOcupadoAtual,
+        limiteLoop,
+        mensagem: vaiParaFilaEspera
+          ? "Grade de 6 minutos preenchida. Seu anúncio foi adicionado à Fila de Espera com sucesso!"
+          : "Anúncio enviado para moderação com sucesso!",
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return Response.json({ error: error.issues[0].message }, { status: 400 });

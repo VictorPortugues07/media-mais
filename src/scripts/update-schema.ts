@@ -7,6 +7,34 @@ async function main() {
     ALTER TABLE "pontos_midia" ADD COLUMN IF NOT EXISTS "codigo_tv" TEXT;
     ALTER TABLE "pontos_midia" ADD COLUMN IF NOT EXISTS "fotos" TEXT[] DEFAULT ARRAY[]::TEXT[];
     ALTER TABLE "pontos_midia" ADD COLUMN IF NOT EXISTS "ultima_atividade" TIMESTAMP(3);
+    ALTER TABLE "pontos_midia" ADD COLUMN IF NOT EXISTS "aceita_novos_anuncios" BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE "pontos_midia" ADD COLUMN IF NOT EXISTS "limite_tempo_segundos" INTEGER NOT NULL DEFAULT 360;
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'StatusAnuncio' AND e.enumlabel = 'FILA_ESPERA'
+      ) THEN
+        ALTER TYPE "StatusAnuncio" ADD VALUE 'FILA_ESPERA';
+      END IF;
+    END $$;
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'TipoNotificacao' AND e.enumlabel = 'FILA_ESPERA'
+      ) THEN
+        ALTER TYPE "TipoNotificacao" ADD VALUE 'FILA_ESPERA';
+      END IF;
+    END $$;
   `);
 
   await prisma.$executeRawUnsafe(`

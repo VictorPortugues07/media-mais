@@ -18,6 +18,12 @@ export interface PontoMapItem {
   fotos?: string[];
   lat?: number | null;
   lng?: number | null;
+  aceitaNovosAnuncios?: boolean;
+  tempoOcupadoSegundos?: number;
+  tempoDisponivelSegundos?: number;
+  limiteTempoSegundos?: number;
+  porcentagemOcupada?: number;
+  quantidadeFilaEspera?: number;
   user?: {
     nome?: string;
     avatarUrl?: string | null;

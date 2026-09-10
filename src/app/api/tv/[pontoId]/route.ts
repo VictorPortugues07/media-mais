@@ -13,13 +13,16 @@ export async function GET(
     return Response.json({ error: "ID invalido" }, { status: 400 });
   }
 
-  // Proteção: o canal /tv/[pontoId] direto só é acessível pelo próprio dono do ponto ou admin autenticado.
-  // Visualizadores externos devem usar o player pareado via código em /player
+  // Proteção: o canal /tv/[pontoId] direto é exclusivo para administradores autenticados (inspeção).
+  // Qualquer outro usuário, Smart TV ou visualizador deve usar o reprodutor oficial pareado via código em /player.
   const session = await getSession();
-  if (!session) {
+  if (!session || session.role !== "ADMIN") {
     return Response.json(
-      { error: "Acesso não autorizado. Para conectar uma TV, acesse /player e informe o código." },
-      { status: 401 }
+      {
+        error:
+          "Acesso restrito a administradores. Para conectar uma Smart TV ou reproduzir o canal, acesse /player e digite o código de pareamento de 6 dígitos.",
+      },
+      { status: 403 }
     );
   }
 
@@ -30,13 +33,6 @@ export async function GET(
 
   if (!ponto || ponto.status !== "ATIVO") {
     return Response.json({ error: "Ponto nao encontrado ou inativo" }, { status: 404 });
-  }
-
-  if (session.role !== "ADMIN" && ponto.userId !== session.userId) {
-    return Response.json(
-      { error: "Acesso restrito. Não é permitido acessar transmissões de outros pontos pela URL." },
-      { status: 403 }
-    );
   }
 
   const anuncios = await prisma.anuncio.findMany({
