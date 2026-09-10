@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "security": "./script.sh",
-    "security:quick": "./script.sh --skip-dast",
-    "security:ci": "./script.sh --require-all"
+    "security": "bash script.sh",
+    "security:quick": "bash script.sh --skip-dast",
+    "security:ci": "bash script.sh --require-all"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
