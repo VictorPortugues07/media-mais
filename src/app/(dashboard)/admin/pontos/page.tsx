@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -9,6 +8,15 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  calcularScorePonderado,
+  determinarTier,
+  formatarMoeda,
+  OPCOES_FLUXO_DIARIO,
+  OPCOES_TEMPO_ESPERA,
+  OPCOES_PERFIL_PUBLICO,
+  OPCOES_EXCLUSIVIDADE,
+} from "@/lib/precificacao";
 
 interface AnuncioDetail {
   id: number;
@@ -34,6 +42,7 @@ interface PontoAdminItem {
   uf: string;
   categoria: string;
   fluxoDiarioEstimado: string;
+  tempoPermanencia?: string;
   status: "PENDENTE" | "ATIVO" | "INATIVO";
   quantidadeTvs: number;
   aceitaNovosAnuncios: boolean;
@@ -47,6 +56,16 @@ interface PontoAdminItem {
   resolucaoTela?: string | null;
   criadoEm: string;
   _count?: { anuncios: number };
+  maxCotas?: number;
+  cotasOcupadas?: number;
+  cotasDisponiveis?: number;
+  tier?: string;
+  cotaMensal?: number;
+  scorePonderado?: number;
+  notaFluxo?: number;
+  notaTempo?: number;
+  notaPerfil?: number;
+  notaExclusividade?: number;
 }
 
 export default function AdminPontosPage() {
@@ -65,6 +84,57 @@ export default function AdminPontosPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Modal de Scoring & Precificação
+  const [scoringModalOpen, setScoringModalOpen] = useState(false);
+  const [pontoForScoring, setPontoForScoring] = useState<PontoAdminItem | null>(null);
+  const [notaFluxo, setNotaFluxo] = useState<number>(3.5);
+  const [notaTempo, setNotaTempo] = useState<number>(3.5);
+  const [notaPerfil, setNotaPerfil] = useState<number>(3.5);
+  const [notaExclusividade, setNotaExclusividade] = useState<number>(3.5);
+  const [maxCotasInput, setMaxCotasInput] = useState<number>(8);
+  const [savingScoring, setSavingScoring] = useState(false);
+
+  const handleOpenScoring = (p: PontoAdminItem) => {
+    setPontoForScoring(p);
+    setNotaFluxo(p.notaFluxo ?? 3.5);
+    setNotaTempo(p.notaTempo ?? 3.5);
+    setNotaPerfil(p.notaPerfil ?? 3.5);
+    setNotaExclusividade(p.notaExclusividade ?? 3.5);
+    setMaxCotasInput(p.maxCotas ?? 8);
+    setScoringModalOpen(true);
+  };
+
+  const handleSaveScoring = async () => {
+    if (!pontoForScoring) return;
+    setSavingScoring(true);
+    try {
+      const res = await fetch(`/api/pontos/${pontoForScoring.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notaFluxo,
+          notaTempo,
+          notaPerfil,
+          notaExclusividade,
+          maxCotas: maxCotasInput,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPontos((prev) =>
+          prev.map((p) => (p.id === pontoForScoring.id ? { ...p, ...data.ponto } : p))
+        );
+        setScoringModalOpen(false);
+        setToastMessage(`Precificação atualizada com sucesso para ${pontoForScoring.nomeEmpresa}!`);
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (e) {
+      console.error("Erro ao salvar scoring:", e);
+    } finally {
+      setSavingScoring(false);
+    }
+  };
 
   const handleOpenCampaigns = async (p: PontoAdminItem) => {
     setSelectedPonto(p);
@@ -217,19 +287,19 @@ export default function AdminPontosPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900 font-heading">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Pontos Cadastrados
-                <span className="ml-2 text-sm font-normal text-slate-400">({filtered.length})</span>
+                <span className="ml-2 text-sm font-normal text-[#9AA3AF]">({filtered.length})</span>
               </h3>
               {pendentes > 0 && (
-                <p className="text-xs text-amber-600 font-semibold mt-0.5">
+                <p className="text-xs text-amber-700 font-semibold mt-0.5">
                   {pendentes} aguardando aprovação
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2">
               <select
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 transition cursor-pointer"
+                className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-2.5 py-1.5 text-xs text-[#344054] outline-none focus:border-[#4F93C9] transition cursor-pointer"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
@@ -241,7 +311,7 @@ export default function AdminPontosPage() {
               <input
                 type="text"
                 placeholder="Buscar ponto, cidade..."
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-blue-400 outline-none w-44 transition"
+                className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] outline-none w-44 transition"
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
               />
@@ -254,76 +324,107 @@ export default function AdminPontosPage() {
               <EmptyState title="Nenhum ponto encontrado" description="Tente ajustar os filtros." />
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#E4E7EC]">
               {filtered.map((ponto) => {
-                const limite = ponto.limiteTempoSegundos || 360;
-                const ocupado = ponto.tempoOcupadoSegundos || 0;
-                const perc = Math.min(100, Math.round((ocupado / limite) * 100));
+                const maxCotas = ponto.maxCotas || 8;
+                const cotasOcupadas = ponto.cotasOcupadas || 0;
+                const percCotas = Math.min(100, Math.round((cotasOcupadas / maxCotas) * 100));
 
                 return (
                   <div
                     key={ponto.id}
-                    className="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/60 transition"
+                    className="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-[#F7F8FA] transition"
                   >
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-slate-900 text-sm">{ponto.nomeEmpresa}</h4>
+                        <h4 className="font-bold text-[#0E1F66] text-sm">{ponto.nomeEmpresa}</h4>
                         <Badge variant={ponto.status === "ATIVO" ? "success" : ponto.status === "PENDENTE" ? "warning" : "default"}>
                           {ponto.status}
                         </Badge>
                         <Badge variant="brand">{ponto.categoria}</Badge>
+                        {ponto.tier && (
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold border ${
+                              ponto.tier === "Ouro"
+                                ? "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
+                                : ponto.tier === "Prata"
+                                ? "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]"
+                                : "bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74]"
+                            }`}
+                          >
+                            {ponto.tier} · R$ {ponto.cotaMensal?.toFixed(2).replace(".", ",")}/mês
+                          </span>
+                        )}
+                        {ponto.scorePonderado && (
+                          <span className="px-2 py-0.5 rounded-md bg-[#4F93C9]/10 text-[#0E1F66] font-bold text-[10px] border border-[#4F93C9]/30">
+                            Score: {ponto.scorePonderado.toFixed(2)}
+                          </span>
+                        )}
                         {ponto.tipoDispositivo && (
-                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-100">
-                            {ponto.tipoDispositivo === "SMART_TV" ? "📺 Smart TV" : ponto.tipoDispositivo === "DESKTOP" ? "🖥️ Monitor / Totem" : ponto.tipoDispositivo}
+                          <span className="px-2 py-0.5 rounded-md bg-[#4F93C9]/10 text-[#0E1F66] font-bold text-[10px] border border-[#4F93C9]/30">
+                            {ponto.tipoDispositivo === "SMART_TV" ? "Smart TV" : ponto.tipoDispositivo === "DESKTOP" ? "Monitor / Totem" : ponto.tipoDispositivo}
                             {ponto.resolucaoTela ? ` (${ponto.resolucaoTela})` : ""}
                           </span>
                         )}
                         {!ponto.aceitaNovosAnuncios ? (
                           <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-[10px]">
-                            ⛔ Solicitações Bloqueadas
+                            Solicitações Bloqueadas
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                            ✓ Recebendo Solicitações
+                          <span className="px-2 py-0.5 rounded-md bg-[#D8E8E1] text-[#1E4333] font-bold text-[10px] border border-[#8FAE9E]/40">
+                            Recebendo Solicitações
                           </span>
                         )}
                         {ponto.quantidadeFilaEspera > 0 && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">
-                            ⏳ {ponto.quantidadeFilaEspera} na Fila de Espera
+                          <span className="px-2 py-0.5 rounded-md bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D] font-bold text-[10px]">
+                            {ponto.quantidadeFilaEspera} na Fila de Espera
                           </span>
                         )}
                       </div>
 
-                      <p className="text-xs text-slate-500">
-                        {ponto.responsavel} · {ponto.whatsapp} · 📍 {ponto.cidade}/{ponto.uf} · {ponto.fluxoDiarioEstimado}
+                      <p className="text-xs text-[#9AA3AF]">
+                        {ponto.responsavel} · {ponto.whatsapp} · {ponto.cidade}/{ponto.uf} · Fluxo: {ponto.fluxoDiarioEstimado}
                       </p>
 
-                      {/* Medidor do Loop de 6 minutos (360s) */}
-                      <div className="max-w-md bg-slate-100 p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                      {/* Medidor de Cotas (1 anunciante ativo = 1 cota) */}
+                      <div className="max-w-md bg-[#F7F8FA] p-2.5 rounded-xl border border-[#E4E7EC] space-y-1">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-slate-700">
-                            Capacidade do Loop da TV (6 min max):
+                          <span className="font-bold text-[#344054]">
+                            Capacidade de Cotas (Máx {maxCotas}):
                           </span>
-                          <span className="font-extrabold text-slate-800">
-                            {ocupado}s / {limite}s ({perc}%)
+                          <span className="font-extrabold text-[#0E1F66]">
+                            {cotasOcupadas} / {maxCotas} cotas ocupadas ({percCotas}%)
                           </span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-[#E4E7EC] rounded-full h-2 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              perc >= 100
+                              percCotas >= 100
                                 ? "bg-amber-500"
-                                : perc > 75
-                                ? "bg-blue-600"
-                                : "bg-emerald-500"
+                                : percCotas > 75
+                                ? "bg-[#4F93C9]"
+                                : "bg-[#8FAE9E]"
                             }`}
-                            style={{ width: `${perc}%` }}
+                            style={{ width: `${percCotas}%` }}
                           />
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {/* Botão de Ajuste de Precificação e Scoring */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenScoring(ponto)}
+                        className="px-2.5 py-1.5 rounded-xl bg-[#4F93C9]/10 hover:bg-[#4F93C9]/20 text-[#0E1F66] font-bold text-xs border border-[#4F93C9]/30 transition cursor-pointer flex items-center gap-1.5"
+                        title="Configurar notas e critérios de precificação"
+                      >
+                        <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        <span>Precificação</span>
+                      </button>
+
                       {/* Botão de Bloqueio / Desbloqueio Manual de Novas Solicitações */}
                       <button
                         type="button"
@@ -339,7 +440,14 @@ export default function AdminPontosPage() {
                             : "Liberar novas solicitações para este ponto"
                         }
                       >
-                        {ponto.aceitaNovosAnuncios ? "🔒 Bloquear Pedidos" : "🔓 Liberar Pedidos"}
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {ponto.aceitaNovosAnuncios ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                          )}
+                        </svg>
+                        <span>{ponto.aceitaNovosAnuncios ? "Bloquear Pedidos" : "Liberar Pedidos"}</span>
                       </button>
 
                       <button
@@ -355,10 +463,6 @@ export default function AdminPontosPage() {
                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                         )}
                       </button>
-
-                      <Link href={`/tv/${ponto.id}`} target="_blank">
-                        <Button variant="secondary" size="sm">Ver TV</Button>
-                      </Link>
 
                       {ponto.status === "PENDENTE" && (
                         <Button variant="success" size="sm" onClick={() => handleUpdateStatus(ponto.id, "ATIVO")}>
@@ -459,8 +563,8 @@ export default function AdminPontosPage() {
                             </p>
                             <p className="text-[10px] text-slate-400">
                               {ad.dataFim
-                                ? `📅 Saída prevista: ${new Date(ad.dataFim).toLocaleDateString("pt-BR")}`
-                                : `📅 Desde ${new Date(ad.criadoEm).toLocaleDateString("pt-BR")}`}
+                                ? `Saída prevista: ${new Date(ad.dataFim).toLocaleDateString("pt-BR")}`
+                                : `Desde ${new Date(ad.criadoEm).toLocaleDateString("pt-BR")}`}
                               {" · "}{ad.totalExibicoes ?? 0} exibições
                             </p>
                           </div>
@@ -530,7 +634,7 @@ export default function AdminPontosPage() {
                               loading={actionAdLoading === ad.id}
                               onClick={() => handlePromoverFila(ad.id)}
                             >
-                              🚀 Promover para TV
+                              Promover para TV
                             </Button>
                             <button
                               type="button"
@@ -607,6 +711,176 @@ export default function AdminPontosPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal de Precificação e Scoring */}
+      <Modal
+        isOpen={scoringModalOpen}
+        onClose={() => !savingScoring && setScoringModalOpen(false)}
+        title={pontoForScoring ? `Precificação & Scoring: ${pontoForScoring.nomeEmpresa}` : "Precificação do Ponto"}
+        description="Ajuste as notas dos critérios ponderados para calcular o Tier e o valor da cota mensal."
+        size="lg"
+      >
+        {pontoForScoring && (() => {
+          const scoreCalc = calcularScorePonderado(notaFluxo, notaTempo, notaPerfil, notaExclusividade);
+          const tierCalc = determinarTier(scoreCalc);
+
+          return (
+            <div className="space-y-4">
+              {/* Resultado em Destaque */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-blue-950 text-white shadow-md">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                      Resultado Calculado
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-0.5">
+                      <span className="text-3xl font-black font-heading text-amber-400">
+                        {tierCalc.tier}
+                      </span>
+                      <span className="text-sm font-semibold text-blue-200">
+                        Score: <strong>{scoreCalc.toFixed(2)}</strong> pts
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-blue-300">Cota Mensal</span>
+                    <p className="text-2xl font-black font-heading text-white mt-0.5">
+                      {formatarMoeda(tierCalc.cotaMensal)}
+                    </p>
+                    <span className="text-[10px] text-blue-200/70">por anunciante / mês</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-white/10 text-xs">
+                  <div>
+                    <span className="text-blue-300/80">Repasse ao Ponto (50%):</span>
+                    <p className="font-bold text-amber-300">{formatarMoeda(tierCalc.repasseAoPonto)}/cota</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-blue-300/80">Receita Mídia+ (50%):</span>
+                    <p className="font-bold text-emerald-400">{formatarMoeda(tierCalc.receitaMidiaMais)}/cota</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Critérios com Seletores */}
+              <div className="space-y-3 text-xs">
+                {/* 1. Volume de Fluxo Diário (30%) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700">
+                      1. Fluxo Diário <span className="text-slate-400 font-normal">(Peso 30%)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600">Nota: {notaFluxo}</span>
+                  </div>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={notaFluxo}
+                    onChange={(e) => setNotaFluxo(Number(e.target.value))}
+                  >
+                    {OPCOES_FLUXO_DIARIO.map((op) => (
+                      <option key={op.nota} value={op.nota}>
+                        {op.label} (Nota {op.nota})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Tempo Médio de Espera (35%) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700">
+                      2. Tempo Médio de Espera <span className="text-slate-400 font-normal">(Peso 35%)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600">Nota: {notaTempo}</span>
+                  </div>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={notaTempo}
+                    onChange={(e) => setNotaTempo(Number(e.target.value))}
+                  >
+                    {OPCOES_TEMPO_ESPERA.map((op) => (
+                      <option key={op.nota} value={op.nota}>
+                        {op.label} (Nota {op.nota})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Poder Aquisitivo / Perfil (20%) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700">
+                      3. Poder Aquisitivo / Perfil do Público <span className="text-slate-400 font-normal">(Peso 20%)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600">Nota: {notaPerfil}</span>
+                  </div>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={notaPerfil}
+                    onChange={(e) => setNotaPerfil(Number(e.target.value))}
+                  >
+                    {OPCOES_PERFIL_PUBLICO.map((op) => (
+                      <option key={op.nota} value={op.nota}>
+                        {op.label} (Nota {op.nota})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Exclusividade / Ruído Visual (15%) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700">
+                      4. Exclusividade e Ruído Visual <span className="text-slate-400 font-normal">(Peso 15%)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600">Nota: {notaExclusividade}</span>
+                  </div>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={notaExclusividade}
+                    onChange={(e) => setNotaExclusividade(Number(e.target.value))}
+                  >
+                    {OPCOES_EXCLUSIVIDADE.map((op) => (
+                      <option key={op.nota} value={op.nota}>
+                        {op.label} (Nota {op.nota})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Capacidade de Cotas */}
+                <div className="pt-1">
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Capacidade Máxima de Cotas <span className="text-slate-400 font-normal">(Padrão: 8)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500"
+                    value={maxCotasInput}
+                    onChange={(e) => setMaxCotasInput(Math.max(1, Number(e.target.value)))}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Cada anunciante ativo ocupa 1 cota. Ao atingir este número, novos anúncios entram na fila de espera.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button variant="ghost" onClick={() => setScoringModalOpen(false)} disabled={savingScoring}>
+                  Cancelar
+                </Button>
+                <Button variant="gradient" loading={savingScoring} onClick={handleSaveScoring}>
+                  Salvar Precificação
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Toast Feedback */}

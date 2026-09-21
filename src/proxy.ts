@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "mediamais_plataforma_secret_2026"
-);
+function getAuthSecret(): Uint8Array {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "FATAL: Variável de ambiente AUTH_SECRET não configurada. Defina AUTH_SECRET no seu arquivo .env"
+    );
+  }
+  return new TextEncoder().encode(secret);
+}
 
 const PUBLIC_ROUTES = ["/", "/login", "/cadastro", "/player"];
 
@@ -14,24 +20,6 @@ export async function proxy(request: NextRequest) {
   // TV player pareado é a rota pública legítima para telas
   if (pathname === "/player") {
     return NextResponse.next();
-  }
-
-  // Rota direta /tv/[pontoId] é de uso exclusivo de administradores (preview).
-  // Qualquer outro usuário ou Smart TV deve obrigatoriamente usar /player com código de pareamento.
-  if (pathname.startsWith("/tv/")) {
-    const token = request.cookies.get("mm_session")?.value;
-    if (!token) {
-      return NextResponse.redirect(new URL("/player", request.url));
-    }
-    try {
-      const { payload } = await jwtVerify(token, SECRET);
-      if (payload.role !== "ADMIN") {
-        return NextResponse.redirect(new URL("/player", request.url));
-      }
-      return NextResponse.next();
-    } catch {
-      return NextResponse.redirect(new URL("/player", request.url));
-    }
   }
 
   // Public routes - allow
@@ -61,7 +49,7 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getAuthSecret());
     const role = payload.role as string;
 
     // Role-based route protection

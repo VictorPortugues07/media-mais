@@ -1,22 +1,48 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-ink: #f8fafc;
-  --color-surface: #ffffff;
-  --color-card: #ffffff;
-  --color-edge: #e2e8f0;
+  --color-ink: #F7F8FA;
+  --color-surface: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-edge: #E4E7EC;
   
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
+  --color-brand-navy: #0E1F66;
+  --color-brand-sky: #4F93C9;
+  --color-brand-sky-hover: #3D82B5;
+  --color-brand-sky-light: #E0EEF8;
+  --color-brand-teal: #8FAE9E;
+  --color-brand-teal-dark: #1E4333;
+  --color-brand-coral: #F2795C;
+  --color-brand-coral-dark: #9C3218;
+  --color-brand-lavender: #CFCFE5;
+  --color-brand-mint: #D8E8E1;
 
-  --color-navy-950: #051160;
-  --color-navy-900: #081675;
-  --color-navy-800: #0d2194;
-  --color-sky-logo: #5699d0;
-  --color-teal-logo: #96bbb0;
+  --color-tier-gold: #B45309;
+  --color-tier-gold-bg: #FEF3C7;
+  --color-tier-gold-border: #FCD34D;
+  --color-tier-silver: #334155;
+  --color-tier-silver-bg: #F1F5F9;
+  --color-tier-silver-border: #CBD5E1;
+  --color-tier-bronze: #9A3412;
+  --color-tier-bronze-bg: #FFEDD5;
+  --color-tier-bronze-border: #FDBA74;
+
+  --color-text-muted: #9AA3AF;
+  --color-text-body: #344054;
+  --color-text-strong: #0E1F66;
+
+  /* Backward-compatible scale */
+  --color-brand-300: #8ec3ea;
+  --color-brand-400: #6caadc;
+  --color-brand-500: #4F93C9;
+  --color-brand-600: #3D82B5;
+  --color-brand-700: #0E1F66;
+
+  --color-navy-950: #0E1F66;
+  --color-navy-900: #0A174E;
+  --color-navy-800: #142B85;
+  --color-sky-logo: #4F93C9;
+  --color-teal-logo: #8FAE9E;
 
   --font-sans: var(--font-inter);
   --font-heading: var(--font-sora);
@@ -25,7 +51,7 @@
 
 body {
   background: var(--color-ink);
-  color: #0f172a;
+  color: var(--color-text-body);
   font-family: var(--font-sans), system-ui, sans-serif;
   overflow-x: hidden;
 }
@@ -35,7 +61,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 ::selection {
-  background: #3b82f6;
+  background: #4F93C9;
   color: white;
 }
 
@@ -45,17 +71,17 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* Brand Gradients */
+/* Brand Gradients - Official Media+ Colors */
 .bg-brand-gradient {
-  background-image: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #60a5fa 100%);
+  background-image: linear-gradient(135deg, #0E1F66 0%, #2A5BA6 55%, #4F93C9 100%);
 }
 
 .bg-brand-gradient-hover {
-  background-image: linear-gradient(135deg, #1e40af 0%, #1d4ed8 50%, #3b82f6 100%);
+  background-image: linear-gradient(135deg, #0A174E 0%, #1E4684 55%, #3D82B5 100%);
 }
 
 .text-brand-gradient {
-  background-image: linear-gradient(135deg, #1d4ed8, #2563eb 50%, #60a5fa);
+  background-image: linear-gradient(135deg, #0E1F66 0%, #2A5BA6 50%, #4F93C9 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

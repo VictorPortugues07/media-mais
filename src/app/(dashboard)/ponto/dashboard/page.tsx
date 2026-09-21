@@ -49,6 +49,12 @@ interface StatsPonto {
   exibicoesPontoHoje?: number;
   horasOnlineEstimadas?: string;
   meusAnunciosAtivos?: number;
+  maxCotas?: number;
+  financeiro?: {
+    repasseMensalEstimado: number;
+    repassePorAnunciante: number;
+    anunciantesAtivos: number;
+  };
 }
 
 function KpiCard({
@@ -69,13 +75,13 @@ function KpiCard({
       <CardBody>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">
+            <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider truncate">
               {label}
             </p>
             <p className={`text-3xl font-black font-heading mt-1.5 ${color}`}>{value}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>
+            <p className="text-[11px] text-[#9AA3AF] mt-0.5">{sub}</p>
           </div>
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-slate-50 ring-1 ring-slate-200/80`}>
+          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-[#F7F8FA] ring-1 ring-[#E4E7EC]`}>
             {icon}
           </div>
         </div>
@@ -243,19 +249,19 @@ export default function PontoDashboard() {
 
         {/* ── Hero de Conexão ─────────────────────────────────────────── */}
         {ponto && (
-          <div className="rounded-3xl bg-gradient-to-br from-[#051160] via-[#0d2194] to-[#1a3fbf] text-white shadow-xl overflow-hidden">
+          <div className="rounded-3xl bg-gradient-to-br from-[#0E1F66] via-[#142B85] to-[#29579E] text-white shadow-xl overflow-hidden">
             <div className="p-6 sm:p-8 flex flex-col lg:flex-row gap-8">
               {/* Esquerda — Status + instruções */}
               <div className="flex-1 space-y-4">
                 <div>
                   {isOnline ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#8FAE9E]/20 text-[#c8e2d6] border border-[#8FAE9E]/40">
+                      <span className="w-2 h-2 rounded-full bg-[#8FAE9E] animate-pulse" />
                       TV Conectada · Transmitindo Ao Vivo
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#F2795C]/20 text-[#f7a895] border border-[#F2795C]/40">
+                      <span className="w-2 h-2 rounded-full bg-[#F2795C]" />
                       Aguardando Conexão
                     </span>
                   )}
@@ -278,7 +284,7 @@ export default function PontoDashboard() {
                     onClick={handleCopyLink}
                     className="shrink-0 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs transition cursor-pointer"
                   >
-                    {copiedLink ? "✓ Copiado" : "Copiar"}
+                    {copiedLink ? "Copiado" : "Copiar"}
                   </button>
                 </div>
               </div>
@@ -286,22 +292,25 @@ export default function PontoDashboard() {
               {/* Direita — Código rotativo */}
               <div className="flex flex-col items-center bg-black/30 border border-white/15 p-5 rounded-2xl shrink-0 w-full lg:w-64 backdrop-blur-sm">
                 <div className="flex items-center justify-between w-full mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-300">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#8ec3ea]">
                     Código de Conexão
                   </span>
-                  <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30">
-                    ⏱ {rotativoSegundos}s
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{rotativoSegundos}s</span>
                   </span>
                 </div>
 
                 <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden mb-4">
                   <div
-                    className="bg-blue-400 h-full transition-all duration-1000 ease-linear"
+                    className="bg-[#4F93C9] h-full transition-all duration-1000 ease-linear"
                     style={{ width: `${(rotativoSegundos / 30) * 100}%` }}
                   />
                 </div>
 
-                <span className="text-5xl font-black font-mono tracking-[0.2em] text-white px-4 py-3 bg-[#020d3a] rounded-2xl border-2 border-blue-500/60 shadow-inner">
+                <span className="text-5xl font-black font-mono tracking-[0.2em] text-white px-4 py-3 bg-[#081342] rounded-2xl border-2 border-[#4F93C9]/60 shadow-inner">
                   {loadingRotativo ? "······" : (rotativoCode || ponto.codigoTv || "------")}
                 </span>
                 <p className="text-[10px] text-blue-200/50 mt-2 mb-3 text-center">
@@ -313,18 +322,20 @@ export default function PontoDashboard() {
                     onClick={handleCopyCode}
                     className="flex-1 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    {copiedCode ? "✓ Copiado!" : "Copiar"}
+                    {copiedCode ? "Copiado!" : "Copiar"}
                   </button>
                   <button
                     onClick={fetchRotativoCode}
                     title="Gerar novo código"
                     className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs transition flex items-center justify-center cursor-pointer"
                   >
-                    🔄
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
                   </button>
                   <button
                     onClick={() => setQrModalOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-[#4F93C9] hover:bg-[#3D82B5] text-white font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-sm shadow-[#4F93C9]/25"
                   >
                     QR
                   </button>
@@ -340,30 +351,151 @@ export default function PontoDashboard() {
             label="Exibições Hoje"
             value={stats?.exibicoesPontoHoje ?? 0}
             sub="veiculações no dia"
-            icon="📊"
-            color="text-emerald-600"
+            icon={
+              <svg className="w-5 h-5 text-[#8FAE9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            }
+            color="text-[#0E1F66]"
           />
           <KpiCard
             label="Total Acumulado"
             value={stats?.totalExibicoesPonto ?? 0}
             sub="reproduções na TV"
-            icon="🎬"
-            color="text-blue-600"
+            icon={
+              <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            color="text-[#0E1F66]"
           />
           <KpiCard
             label="Tempo no Ar"
             value={`${stats?.horasOnlineEstimadas ?? "0.0"}h`}
             sub="horas transmitidas"
-            icon="⏱"
-            color="text-sky-600"
+            icon={
+              <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            color="text-[#0E1F66]"
           />
           <KpiCard
             label="Anúncios Ativos"
             value={anuncios.length}
             sub="campanhas em loop"
-            icon="📺"
-            color="text-indigo-600"
+            icon={
+              <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            }
+            color="text-[#0E1F66]"
           />
+        </div>
+
+        {/* ── Resumo de Faturamento e Repasses ─────────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-[#0E1F66] font-heading">
+                Faturamento & Repasses Estimados
+              </h3>
+              <p className="text-xs text-[#9AA3AF]">
+                Ganhos mensais calculados pelos anunciantes ativos na sua tela
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-[#1E4333] bg-[#D8E8E1] border border-[#8FAE9E]/50 px-2.5 py-1 rounded-lg flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" />
+              Pagamentos mensais garantidos
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border-l-4 border-l-[#8FAE9E]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Repasse Mensal Estimado
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
+                      {(stats?.financeiro?.repasseMensalEstimado ?? 0).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      total acumulado no mês atual
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#D8E8E1] text-[#1E4333] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5 text-[#1E4333]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card className="border-l-4 border-l-[#4F93C9]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Ganho por Anunciante
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#4F93C9] mt-1">
+                      + {(stats?.financeiro?.repassePorAnunciante ?? 0).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      a mais por cada novo anunciante ativo
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#4F93C9]/10 text-[#4F93C9] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card className="border-l-4 border-l-[#0E1F66]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Ocupação de Cotas
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
+                      {anuncios.length} / {stats?.maxCotas || 8}
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      cotas preenchidas na sua TV
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#0E1F66]/10 text-[#0E1F66] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+          <div className="p-3.5 bg-[#4F93C9]/10 border border-[#4F93C9]/30 rounded-2xl flex items-start gap-3">
+            <svg className="w-5 h-5 text-[#0E1F66] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-[#0E1F66] leading-relaxed">
+              <strong>Como funciona seu repasse:</strong> Você recebe mensalmente por cada anunciante ativo transmitido na sua TV. Quanto mais cotas preenchidas, maior seu faturamento. Sempre que um novo anunciante entrar, você receberá uma notificação informando o acréscimo de ganho.
+            </p>
+          </div>
         </div>
 
         {/* ── Playlist atual ───────────────────────────────────────────── */}
@@ -371,21 +503,20 @@ export default function PontoDashboard() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-slate-900 font-heading">Grade de Transmissão</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Anúncios em loop contínuo na sua TV · Loop:{" "}
+                <h3 className="font-bold text-[#0E1F66] font-heading">Grade de Transmissão</h3>
+                <p className="text-xs text-[#9AA3AF] mt-0.5">
+                  Anúncios ativos no loop da sua TV ·{" "}
                   <strong>
-                    {anuncios.reduce((acc, a) => acc + (a.duracaoSegundos || 10), 0)}s de 360s (6 min)
+                    {anuncios.length} de {stats?.maxCotas || 8} cotas ocupadas
                   </strong>
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={anuncios.length > 0 ? "success" : "default"}>
-                  {anuncios.length} no ar (
-                  {anuncios.reduce((acc, a) => acc + (a.duracaoSegundos || 10), 0)}s)
+                <Badge variant={anuncios.length > 0 ? "live" : "default"}>
+                  {anuncios.length} no ar ({anuncios.length}/{stats?.maxCotas || 8} cotas)
                 </Badge>
                 <Link href="/ponto/anuncios">
-                  <button className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition px-2 py-1 rounded-lg hover:bg-blue-50 cursor-pointer">
+                  <button className="text-xs font-semibold text-[#4F93C9] hover:text-[#0E1F66] transition px-2 py-1 rounded-lg hover:bg-[#4F93C9]/10 cursor-pointer">
                     Ver todos →
                   </button>
                 </Link>
@@ -401,17 +532,17 @@ export default function PontoDashboard() {
                 />
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[#E4E7EC]">
                 {anuncios.map((ad, idx) => (
-                  <div key={ad.id} className="px-5 py-3.5 flex items-center gap-4 hover:bg-slate-50/70 transition">
-                    <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 font-black text-xs flex items-center justify-center shrink-0 border border-blue-100">
+                  <div key={ad.id} className="px-5 py-3.5 flex items-center gap-4 hover:bg-[#F7F8FA] transition">
+                    <span className="w-7 h-7 rounded-lg bg-[#8FAE9E]/15 text-[#1E4333] font-black text-xs flex items-center justify-center shrink-0 border border-[#8FAE9E]/30">
                       {idx + 1}
                     </span>
                     <button
                       type="button"
                       onClick={() => setPreviewAd(ad)}
                       title="Clique para visualizar mídia"
-                      className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0 relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-14 h-10 bg-[#0E1F66] rounded-lg overflow-hidden shrink-0 relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
                     >
                       {ad.tipoMidia === "VIDEO" ? (
                         <video src={ad.midiaUrl} muted className="w-full h-full object-cover" />
@@ -429,21 +560,21 @@ export default function PontoDashboard() {
                       <button
                         type="button"
                         onClick={() => setPreviewAd(ad)}
-                        className="font-semibold text-slate-800 text-sm truncate hover:text-blue-600 transition text-left cursor-pointer"
+                        className="font-semibold text-[#0E1F66] text-sm truncate hover:text-[#4F93C9] transition text-left cursor-pointer"
                       >
                         {ad.titulo}
                       </button>
-                      <p className="text-xs text-slate-400 truncate">
+                      <p className="text-xs text-[#9AA3AF] truncate">
                         {ad.anunciante.nomeEmpresa} · {ad.tipoMidia === "VIDEO" ? `${ad.duracaoSegundos}s` : "Imagem"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="success">Ao vivo</Badge>
+                      <Badge variant="live">Ao vivo</Badge>
                       <button
                         type="button"
                         title="Visualizar peça"
                         onClick={() => setPreviewAd(ad)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        className="p-1.5 rounded-lg text-[#9AA3AF] hover:text-[#4F93C9] hover:bg-[#4F93C9]/10 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -454,7 +585,7 @@ export default function PontoDashboard() {
                         type="button"
                         title="Solicitar remoção deste anúncio da sua TV"
                         onClick={() => handleOpenRemovalModal(ad)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                        className="p-1.5 rounded-lg text-[#9AA3AF] hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

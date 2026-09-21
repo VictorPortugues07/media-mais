@@ -17,11 +17,12 @@ import { formatCep, formatPhone, buscarCep } from "@/lib/utils";
 
 export default function AnunciantePerfilPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [form, setForm] = useState({
     nome: "",
@@ -52,49 +53,54 @@ export default function AnunciantePerfilPage() {
     generoAlvo: "Misto (equilibrado)",
   });
 
-  useEffect(() => {
-    async function loadPerfil() {
-      try {
-        const res = await fetch("/api/anunciante/perfil");
-        if (res.ok) {
-          const data = await res.json();
-          const { user, anunciante } = data;
-          setForm({
-            nome: user.nome || "",
-            email: user.email || "",
-            senha: "",
-            whatsapp: formatPhone(user.whatsapp || anunciante.whatsapp || ""),
-            avatarUrl: user.avatarUrl || "",
-            nomeEmpresa: anunciante.nomeEmpresa || "",
-            responsavel: anunciante.responsavel || "",
-            instagramSite: anunciante.instagramSite || "",
-            logoUrl: anunciante.logoUrl || "",
-            fotos: anunciante.fotos || [],
-            cep: formatCep(anunciante.cep || ""),
-            rua: anunciante.rua || "",
-            numero: anunciante.numero || "",
-            complemento: anunciante.complemento || "",
-            bairro: anunciante.bairro || "",
-            cidade: anunciante.cidade || "",
-            uf: anunciante.uf || "",
-            categoria: anunciante.categoria || "",
-            oQueAnunciar: anunciante.oQueAnunciar || "",
-            descricaoAnuncio: anunciante.descricaoAnuncio || "",
-            preferenciaLocalizacao: anunciante.preferenciaLocalizacao || "Mesma cidade",
-            distanciaMaxima: anunciante.distanciaMaxima || "10 km",
-            bairrosEspecificos: anunciante.bairrosEspecificos || "",
-            categoriasEspecificas: anunciante.categoriasEspecificas || [],
-            faixaEtariaAlvo: anunciante.faixaEtariaAlvo || [],
-            generoAlvo: anunciante.generoAlvo || "Misto (equilibrado)",
-          });
-        }
-      } catch (err) {
-        console.error("Erro ao carregar perfil:", err);
-      } finally {
-        setLoading(false);
+  const loadPerfil = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/anunciante/perfil");
+      if (res.ok) {
+        const data = await res.json();
+        const { user, anunciante } = data;
+        setForm({
+          nome: user.nome || "",
+          email: user.email || "",
+          senha: "",
+          whatsapp: formatPhone(user.whatsapp || anunciante.whatsapp || ""),
+          avatarUrl: user.avatarUrl || "",
+          nomeEmpresa: anunciante.nomeEmpresa || "",
+          responsavel: anunciante.responsavel || "",
+          instagramSite: anunciante.instagramSite || "",
+          logoUrl: anunciante.logoUrl || "",
+          fotos: anunciante.fotos || [],
+          cep: formatCep(anunciante.cep || ""),
+          rua: anunciante.rua || "",
+          numero: anunciante.numero || "",
+          complemento: anunciante.complemento || "",
+          bairro: anunciante.bairro || "",
+          cidade: anunciante.cidade || "",
+          uf: anunciante.uf || "",
+          categoria: anunciante.categoria || "",
+          oQueAnunciar: anunciante.oQueAnunciar || "",
+          descricaoAnuncio: anunciante.descricaoAnuncio || "",
+          preferenciaLocalizacao: anunciante.preferenciaLocalizacao || "Mesma cidade",
+          distanciaMaxima: anunciante.distanciaMaxima || "10 km",
+          bairrosEspecificos: anunciante.bairrosEspecificos || "",
+          categoriasEspecificas: anunciante.categoriasEspecificas || [],
+          faixaEtariaAlvo: anunciante.faixaEtariaAlvo || [],
+          generoAlvo: anunciante.generoAlvo || "Misto (equilibrado)",
+        });
+        setLoadError(false);
+      } else {
+        setLoadError(true);
       }
+    } catch (err) {
+      console.error("Erro ao carregar perfil:", err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadPerfil();
   }, []);
 
@@ -237,6 +243,8 @@ export default function AnunciantePerfilPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loadError) return;
+
     setSaving(true);
     setMessage(null);
 
@@ -264,7 +272,7 @@ export default function AnunciantePerfilPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ink">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Spinner size="lg" />
       </div>
     );
@@ -277,10 +285,29 @@ export default function AnunciantePerfilPage() {
       userEmail={form.email}
       userAvatar={form.avatarUrl || null}
       title="Usuário & Anunciante"
-      description="Gerencie seus dados de acesso, foto de perfil e informações da marca"
+      description="Gerencie seus dados de acesso, logotipo e preferências de campanha"
     >
       <div className="max-w-4xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {loadError && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2 font-medium">
+                <svg className="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>
+                  Falha ao carregar os dados cadastrais do servidor. Para evitar perda de dados, a gravação está bloqueada até a restauração.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadPerfil}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0 cursor-pointer"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
           {message && (
             <div
               className={`p-4 rounded-2xl border text-sm font-semibold flex items-center gap-3 ${
@@ -295,22 +322,22 @@ export default function AnunciantePerfilPage() {
           )}
 
           {/* Dados do Usuário & Foto de Perfil */}
-          <Card className="border-blue-100 shadow-sm">
-            <CardHeader className="bg-blue-50/40">
-              <h3 className="font-bold text-slate-900 font-heading">
+          <Card className="border-[#E4E7EC] shadow-xs">
+            <CardHeader className="bg-[#F7F8FA]">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Perfil do Usuário & Credenciais de Acesso
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#9AA3AF]">
                 Altere sua foto de perfil, dados pessoais e senha de acesso à plataforma
               </p>
             </CardHeader>
             <CardBody className="space-y-6">
               {/* Foto de Perfil */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Foto de Perfil do Usuário
                 </label>
-                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
                   <div className="relative">
                     {form.avatarUrl ? (
                       <img
@@ -328,14 +355,14 @@ export default function AnunciantePerfilPage() {
                   </div>
 
                   <div className="flex-1 text-center sm:text-left space-y-2">
-                    <p className="text-xs font-bold text-slate-800">
+                    <p className="text-xs font-bold text-[#0E1F66]">
                       {form.avatarUrl ? "Foto atual configurada" : "Nenhuma foto de perfil adicionada"}
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-[#9AA3AF]">
                       Recomendado: imagem quadrada (JPG, PNG ou WebP até 5MB)
                     </p>
                     <div className="flex items-center gap-2 justify-center sm:justify-start pt-1">
-                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer">
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#4F93C9] hover:bg-[#3D82B5] text-white font-bold text-xs shadow-xs transition cursor-pointer">
                         <input
                           type="file"
                           accept="image/*"
@@ -359,7 +386,7 @@ export default function AnunciantePerfilPage() {
                         <button
                           type="button"
                           onClick={removeAvatar}
-                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-red-50 hover:text-red-700 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-700 font-semibold text-xs transition cursor-pointer"
                         >
                           Remover
                         </button>
@@ -370,7 +397,7 @@ export default function AnunciantePerfilPage() {
               </div>
 
               {/* Campos de Acesso */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#E4E7EC]">
                 <Input
                   label="Nome do Responsável"
                   required
@@ -405,28 +432,30 @@ export default function AnunciantePerfilPage() {
           {/* Logotipo e Fotos da Empresa */}
           <Card>
             <CardHeader>
-              <h3 className="font-bold text-slate-900 font-heading">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Identidade Visual & Fotos da Marca
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#9AA3AF]">
                 Logotipo e imagens institucionais da sua empresa
               </p>
             </CardHeader>
             <CardBody className="space-y-6">
               {/* Logotipo */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Logotipo da Marca
                 </label>
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                  <div className="w-20 h-20 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC] flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                     {form.logoUrl ? (
                       <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                     ) : (
-                      <span className="text-2xl text-slate-400">🏢</span>
+                      <svg className="w-8 h-8 text-[#9AA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
                     )}
                   </div>
-                  <label className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer border border-slate-200">
+                  <label className="px-4 py-2 rounded-xl bg-[#F7F8FA] hover:bg-slate-200 text-[#344054] font-semibold text-xs transition cursor-pointer border border-[#E4E7EC]">
                     <input
                       type="file"
                       accept="image/*"
@@ -441,24 +470,24 @@ export default function AnunciantePerfilPage() {
 
               {/* Fotos da Empresa */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Fotos e Portfólio da Empresa
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {form.fotos.map((foto, idx) => (
-                    <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-video border border-slate-200 shadow-xs bg-slate-900">
+                    <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-video border border-[#E4E7EC] shadow-xs bg-slate-900">
                       <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => removeFoto(idx)}
-                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition shadow-md cursor-pointer"
+                        className="absolute top-2 right-2 bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition shadow-md cursor-pointer"
                       >
                         ✕
                       </button>
                     </div>
                   ))}
 
-                  <label className="flex flex-col items-center justify-center aspect-video rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 transition cursor-pointer p-4 text-center">
+                  <label className="flex flex-col items-center justify-center aspect-video rounded-2xl border-2 border-dashed border-[#E4E7EC] hover:border-[#4F93C9] bg-[#F7F8FA] hover:bg-[#4F93C9]/10 transition cursor-pointer p-4 text-center">
                     <input
                       type="file"
                       accept="image/*"
@@ -470,9 +499,12 @@ export default function AnunciantePerfilPage() {
                       <Spinner size="sm" />
                     ) : (
                       <>
-                        <div className="text-2xl mb-1">📸</div>
-                        <span className="text-xs font-bold text-blue-600">Adicionar Foto</span>
-                        <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG até 10MB</span>
+                        <svg className="w-7 h-7 text-[#4F93C9] mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="text-xs font-bold text-[#4F93C9]">Adicionar Foto</span>
+                        <span className="text-[10px] text-[#9AA3AF] mt-0.5">PNG, JPG até 10MB</span>
                       </>
                     )}
                   </label>
@@ -484,8 +516,8 @@ export default function AnunciantePerfilPage() {
           {/* Dados da Empresa */}
           <Card>
             <CardHeader>
-              <h3 className="font-bold text-slate-900 font-heading">Informações da Empresa</h3>
-              <p className="text-xs text-slate-500">Endereço e dados institucionais</p>
+              <h3 className="font-bold text-[#0E1F66] font-heading">Informações da Empresa</h3>
+              <p className="text-xs text-[#9AA3AF]">Endereço e dados institucionais</p>
             </CardHeader>
             <CardBody className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -569,8 +601,8 @@ export default function AnunciantePerfilPage() {
           {/* Preferências de Divulgação */}
           <Card>
             <CardHeader>
-              <h3 className="font-bold text-slate-900 font-heading">Objetivos de Divulgação</h3>
-              <p className="text-xs text-slate-500">Definições para direcionamento de anúncios</p>
+              <h3 className="font-bold text-[#0E1F66] font-heading">Objetivos de Divulgação</h3>
+              <p className="text-xs text-[#9AA3AF]">Definições para direcionamento de anúncios</p>
             </CardHeader>
             <CardBody className="space-y-4">
               <Input
@@ -580,12 +612,12 @@ export default function AnunciantePerfilPage() {
               />
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-1.5">
                   Descrição da Oferta / Campanha
                 </label>
                 <textarea
                   rows={3}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  className="w-full rounded-xl border border-[#E4E7EC] p-3 text-sm text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
                   value={form.descricaoAnuncio}
                   onChange={(e) => setForm({ ...form, descricaoAnuncio: e.target.value })}
                 />
@@ -599,7 +631,7 @@ export default function AnunciantePerfilPage() {
               />
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Tipos de Estabelecimentos de Interesse
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -612,8 +644,8 @@ export default function AnunciantePerfilPage() {
                         onClick={() => toggleCategoria(cat)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                           selected
-                            ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                            ? "bg-[#4F93C9] text-white border-[#4F93C9] shadow-xs"
+                            : "bg-[#F7F8FA] text-[#344054] border-[#E4E7EC] hover:bg-slate-100"
                         }`}
                       >
                         {cat}
@@ -624,7 +656,7 @@ export default function AnunciantePerfilPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Faixa Etária Alvo
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -637,8 +669,8 @@ export default function AnunciantePerfilPage() {
                         onClick={() => toggleFaixaEtaria(faixa)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                           selected
-                            ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                            ? "bg-[#4F93C9] text-white border-[#4F93C9] shadow-xs"
+                            : "bg-[#F7F8FA] text-[#344054] border-[#E4E7EC] hover:bg-slate-100"
                         }`}
                       >
                         {faixa}
@@ -651,7 +683,13 @@ export default function AnunciantePerfilPage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" size="lg" variant="gradient" loading={saving}>
+            <Button
+              type="submit"
+              size="lg"
+              variant="gradient"
+              loading={saving}
+              disabled={loading || saving || loadError}
+            >
               Salvar Alterações
             </Button>
           </div>

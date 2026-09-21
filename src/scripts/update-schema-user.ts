@@ -1,3 +1,7 @@
+/**
+ * @deprecated Este script foi substituído pelo controle formal de migrações em prisma/migrations/
+ * Utilize `npx prisma migrate deploy` ou `npx prisma migrate dev` em vez de executar este arquivo.
+ */
 import { prisma } from "../lib/prisma";
 
 async function main() {

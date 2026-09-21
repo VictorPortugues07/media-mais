@@ -149,15 +149,15 @@ export default function AdminAnunciantesPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900 font-heading">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Anunciantes Cadastrados
-                <span className="ml-2 text-sm font-normal text-slate-400">({filtered.length})</span>
+                <span className="ml-2 text-sm font-normal text-[#9AA3AF]">({filtered.length})</span>
               </h3>
             </div>
             <input
               type="text"
               placeholder="Buscar empresa, cidade..."
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-blue-400 outline-none w-full sm:w-52 transition"
+              className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] outline-none w-full sm:w-52 transition"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
             />
@@ -169,50 +169,52 @@ export default function AdminAnunciantesPage() {
               <EmptyState title="Nenhum anunciante encontrado" description="Tente ajustar a busca." />
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#E4E7EC]">
               {filtered.map((anu) => (
                 <div
                   key={anu.id}
-                  className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/60 transition"
+                  className="px-5 py-4 flex items-center gap-4 hover:bg-[#F7F8FA] transition"
                 >
                   {/* Avatar / Logo */}
                   {anu.logoUrl ? (
                     <img
                       src={anu.logoUrl}
                       alt={anu.nomeEmpresa}
-                      className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                      className="w-10 h-10 rounded-xl object-cover border border-[#E4E7EC] shrink-0"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#0E1F66] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
                       {anu.nomeEmpresa.substring(0, 2).toUpperCase()}
                     </div>
                   )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold text-slate-900 text-sm">{anu.nomeEmpresa}</p>
+                      <p className="font-bold text-[#0E1F66] text-sm">{anu.nomeEmpresa}</p>
                       <Badge variant="brand">{anu.categoria}</Badge>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-[#344054] mt-0.5">
                       {anu.responsavel} · {anu.whatsapp}
                     </p>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">
-                      📍 {anu.cidade}/{anu.uf} · {anu.oQueAnunciar}
+                    <p className="text-xs text-[#9AA3AF] mt-0.5 truncate flex items-center gap-1">
+                      <span>{anu.cidade}/{anu.uf}</span>
+                      <span>·</span>
+                      <span>{anu.oQueAnunciar}</span>
                     </p>
                   </div>
 
                   <div className="shrink-0 flex items-center gap-3">
                     <div className="text-right">
-                      <p className="font-black text-slate-800 text-lg">{anu._count?.anuncios ?? 0}</p>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">campanha(s)</p>
+                      <p className="font-black text-[#0E1F66] text-lg">{anu._count?.anuncios ?? 0}</p>
+                      <p className="text-[10px] text-[#9AA3AF] uppercase font-semibold">campanha(s)</p>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleOpenCampaigns(anu)}
-                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-blue-100"
+                      className="px-3 py-1.5 rounded-xl bg-[#4F93C9]/10 hover:bg-[#4F93C9]/20 text-[#0E1F66] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-[#4F93C9]/30"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>

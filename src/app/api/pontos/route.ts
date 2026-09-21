@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { geocodeAddress } from "@/lib/geocode";
+import { calcularPrecificacaoPonto } from "@/lib/precificacao";
 import { z } from "zod";
 import { NextRequest } from "next/server";
 
@@ -29,6 +30,9 @@ const pontoSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  const isAdmin = session?.role === "ADMIN";
+
   const { searchParams } = request.nextUrl;
   const cidade = searchParams.get("cidade");
   const categoria = searchParams.get("categoria");
@@ -37,13 +41,17 @@ export async function GET(request: NextRequest) {
   const where: Record<string, unknown> = {};
   if (cidade) where.cidade = { contains: cidade, mode: "insensitive" };
   if (categoria) where.categoria = categoria;
-  if (status) where.status = status;
-  else where.status = "ATIVO";
+  if (status) {
+    where.status = status;
+  } else if (!isAdmin) {
+    // Público e anunciantes só podem ver pontos já aprovados e ativos
+    where.status = "ATIVO";
+  }
 
   const pontos = await prisma.pontoMidia.findMany({
     where,
     include: {
-      user: { select: { nome: true, email: true, avatarUrl: true } },
+      user: { select: { nome: true, avatarUrl: true } },
       anuncios: {
         where: { status: { in: ["ATIVO", "FILA_ESPERA"] } },
         select: {
@@ -65,16 +73,37 @@ export async function GET(request: NextRequest) {
   const pontosComMetricas = pontos.map((p) => {
     const ativos = p.anuncios.filter((a) => a.status === "ATIVO");
     const fila = p.anuncios.filter((a) => a.status === "FILA_ESPERA");
+    
+    // Cotas (1 anunciante ativo = 1 cota)
+    const maxCotas = p.maxCotas || 8;
+    const cotasOcupadas = ativos.length;
+    const cotasDisponiveis = Math.max(0, maxCotas - cotasOcupadas);
+    const porcentagemOcupada = Math.min(
+      100,
+      Math.round((cotasOcupadas / maxCotas) * 100)
+    );
+
+    // Precificação
+    const precificacao = calcularPrecificacaoPonto({
+      fluxoDiarioEstimado: p.fluxoDiarioEstimado,
+      tempoPermanencia: p.tempoPermanencia,
+      notaFluxo: p.notaFluxo,
+      notaTempo: p.notaTempo,
+      notaPerfil: p.notaPerfil,
+      notaExclusividade: p.notaExclusividade,
+    });
+
+    const tier = p.tier || precificacao.tier;
+    const cotaMensal = p.cotaMensal ?? precificacao.cotaMensal;
+    const scorePonderado = p.scorePonderado ?? precificacao.scorePonderado;
+    const repasseAoPonto = precificacao.repasseAoPonto;
+
     const tempoOcupadoSegundos = ativos.reduce(
       (acc, a) => acc + (a.duracaoSegundos || 10),
       0
     );
     const limiteTempoSegundos = p.limiteTempoSegundos || 360;
     const tempoDisponivelSegundos = Math.max(0, limiteTempoSegundos - tempoOcupadoSegundos);
-    const porcentagemOcupada = Math.min(
-      100,
-      Math.round((tempoOcupadoSegundos / limiteTempoSegundos) * 100)
-    );
 
     // Encontrar data de término mais próxima entre anúncios ativos
     const datasFim = ativos
@@ -83,15 +112,24 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const proximaLiberacao = datasFim[0] || null;
 
-    // Remover lista de anúncios interna para resposta mais limpa
-    const { anuncios: _a, ...resto } = p;
+    // Remover lista de anúncios interna e dados sensíveis de pareamento para não-admins
+    const { anuncios: _a, codigoTv, codigoRotativo, codigoRotativoExpira, ...resto } = p;
+    const podeVerCodigos = isAdmin || (session?.role === "PONTO" && session?.userId === p.userId);
 
     return {
       ...resto,
+      ...(podeVerCodigos ? { codigoTv, codigoRotativo, codigoRotativoExpira } : {}),
+      maxCotas,
+      cotasOcupadas,
+      cotasDisponiveis,
+      porcentagemOcupada,
+      tier,
+      cotaMensal,
+      scorePonderado,
+      repasseAoPonto,
       tempoOcupadoSegundos,
       tempoDisponivelSegundos,
       limiteTempoSegundos,
-      porcentagemOcupada,
       quantidadeFilaEspera: fila.length,
       proximaLiberacao,
     };
@@ -102,7 +140,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     if (!session || session.role !== "PONTO") {
       return Response.json({ error: "Nao autorizado" }, { status: 401 });
     }
@@ -133,30 +171,56 @@ export async function POST(request: NextRequest) {
       // Ignore geocode errors if Nominatim fails or times out
     }
 
-  // Gerar código único de 6 dígitos para o novo ponto
-  let codigoTv = "";
-  let isUnique = false;
-  while (!isUnique) {
-    codigoTv = Math.floor(100000 + Math.random() * 900000).toString();
-    const exists = await prisma.pontoMidia.findFirst({ where: { codigoTv } });
-    if (!exists) isUnique = true;
-  }
+    // Gerar código único de 6 dígitos com limite de tentativas para evitar loop infinito
+    let codigoTv = "";
+    let isUnique = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 15;
 
-  const ponto = await prisma.pontoMidia.create({
-    data: {
-      ...data,
-      userId: session.userId,
-      codigoTv,
-      lat: geo?.lat ?? null,
-      lng: geo?.lng ?? null,
-      status: "ATIVO",
-    },
-  });
+    while (!isUnique && attempts < MAX_ATTEMPTS) {
+      attempts++;
+      codigoTv = Math.floor(100000 + Math.random() * 900000).toString();
+      const exists = await prisma.pontoMidia.findFirst({ where: { codigoTv } });
+      if (!exists) isUnique = true;
+    }
+
+    if (!isUnique) {
+      return Response.json(
+        { error: "Erro ao gerar código de TV exclusivo. Tente novamente." },
+        { status: 500 }
+      );
+    }
+
+    // Calcular precificação inicial com base nos dados do ponto
+    const precificacao = calcularPrecificacaoPonto({
+      fluxoDiarioEstimado: data.fluxoDiarioEstimado,
+      tempoPermanencia: data.tempoPermanencia,
+    });
+
+    // Pontos recém-criados devem entrar como PENDENTE para moderação antes de irem para o catálogo público
+    const ponto = await prisma.pontoMidia.create({
+      data: {
+        ...data,
+        userId: session.userId,
+        codigoTv,
+        lat: geo?.lat ?? null,
+        lng: geo?.lng ?? null,
+        status: "PENDENTE",
+        maxCotas: 8,
+        notaFluxo: precificacao.notaFluxo,
+        notaTempo: precificacao.notaTempo,
+        notaPerfil: precificacao.notaPerfil,
+        notaExclusividade: precificacao.notaExclusividade,
+        scorePonderado: precificacao.scorePonderado,
+        tier: precificacao.tier,
+        cotaMensal: precificacao.cotaMensal,
+      },
+    });
 
     return Response.json({ ponto }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0].message }, { status: 400 });
+      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
     }
     console.error("Create ponto error:", error);
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });

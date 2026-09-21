@@ -53,36 +53,52 @@ function StatusPill({
 }) {
   if (status === "ATIVO" && tvOnline) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#D8E8E1] text-[#1E4333] border border-[#8FAE9E]/50">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E] animate-pulse" />
         Ao Vivo
       </span>
     );
   }
   if (status === "ATIVO") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-        <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
         Ativo
       </span>
     );
   }
   if (status === "FILA_ESPERA") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#B45309] animate-pulse" />
         Fila de Espera {posicaoFila ? `#${posicaoFila}` : ""}
       </span>
     );
   }
-  if (status === "PENDENTE") return <Badge variant="warning">Moderação</Badge>;
+  if (status === "PENDENTE") return <Badge variant="info">Moderação</Badge>;
   if (status === "REJEITADO") return <Badge variant="danger">Rejeitado</Badge>;
   return <Badge>{status}</Badge>;
+}
+
+interface AnuncianteStats {
+  financeiro?: {
+    gastoMensalTotal: number;
+    detalhamentoCampanhas: Array<{
+      anuncioId: number;
+      titulo: string;
+      pontoId: number;
+      pontoNome: string;
+      cidade: string;
+      tier: string;
+      cotaMensal: number;
+    }>;
+  };
 }
 
 export default function AnuncianteDashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [anuncios, setAnuncios] = useState<AnuncioItem[]>([]);
+  const [stats, setStats] = useState<AnuncianteStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewAd, setPreviewAd] = useState<AnuncioItem | null>(null);
   const [removalModalOpen, setRemovalModalOpen] = useState(false);
@@ -130,12 +146,14 @@ export default function AnuncianteDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [userRes, anunciosRes] = await Promise.all([
+        const [userRes, anunciosRes, statsRes] = await Promise.all([
           fetch("/api/auth/me"),
           fetch("/api/anuncios"),
+          fetch("/api/stats"),
         ]);
         if (userRes.ok) setUser((await userRes.json()).user);
         if (anunciosRes.ok) setAnuncios((await anunciosRes.json()).anuncios || []);
+        if (statsRes.ok) setStats(await statsRes.json());
       } catch (err) {
         console.error("Dashboard error:", err);
       } finally {
@@ -185,30 +203,50 @@ export default function AnuncianteDashboard() {
           {[
             {
               label: "Ativos", value: ativos.length, sub: "veiculando nas TVs",
-              icon: "📺", color: "text-blue-600", bg: "bg-blue-50", ring: "ring-blue-100",
+              icon: (
+                <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ),
+              color: "text-[#0E1F66]", bg: "bg-[#4F93C9]/10", ring: "ring-[#4F93C9]/20",
             },
             {
               label: "Fila de Espera", value: naFila.length, sub: "aguardando vagas",
-              icon: "⏳", color: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-100",
+              icon: (
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+              color: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-100",
             },
             {
               label: "Em Moderação", value: pendentes.length, sub: "em análise pela equipe",
-              icon: "📋", color: "text-indigo-600", bg: "bg-indigo-50", ring: "ring-indigo-100",
+              icon: (
+                <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              ),
+              color: "text-[#0E1F66]", bg: "bg-slate-100", ring: "ring-slate-200",
             },
             {
               label: "Total Exibições", value: totalExibicoes.toLocaleString("pt-BR"), sub: "reproduções acumuladas",
-              icon: "📊", color: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-100",
+              icon: (
+                <svg className="w-5 h-5 text-[#8FAE9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              ),
+              color: "text-[#0E1F66]", bg: "bg-[#D8E8E1]", ring: "ring-[#8FAE9E]/30",
             },
           ].map((kpi) => (
             <Card key={kpi.label}>
               <CardBody>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{kpi.label}</p>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">{kpi.label}</p>
                     <p className={`text-3xl font-black font-heading mt-1.5 ${kpi.color}`}>{kpi.value}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{kpi.sub}</p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5 leading-tight">{kpi.sub}</p>
                   </div>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0 ${kpi.bg} ring-1 ${kpi.ring}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpi.bg} ring-1 ${kpi.ring}`}>
                     {kpi.icon}
                   </div>
                 </div>
@@ -217,13 +255,140 @@ export default function AnuncianteDashboard() {
           ))}
         </div>
 
+        {/* ── Resumo Financeiro & Faturamento ─────────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-[#0E1F66] font-heading">
+                Resumo do Faturamento & Investimento
+              </h3>
+              <p className="text-xs text-[#9AA3AF]">
+                Valor mensal correspondente às cotas das suas campanhas ativas
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-[#344054] bg-[#F7F8FA] border border-[#E4E7EC] px-2.5 py-1 rounded-lg">
+              Pagamento online via API em breve
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border-l-4 border-l-[#4F93C9]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Investimento Mensal
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
+                      {(stats?.financeiro?.gastoMensalTotal ?? 0).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      total de cotas ativas no ar
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#4F93C9]/10 text-[#4F93C9] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card className="border-l-4 border-l-[#8FAE9E]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Cotas em Transmissão
+                    </p>
+                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#1E4333] mt-1">
+                      {ativos.length}
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      {ativos.length === 1 ? "1 TV veiculando" : `${ativos.length} TVs veiculando`}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#D8E8E1] text-[#1E4333] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card className="border-l-4 border-l-[#0E1F66]">
+              <CardBody>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
+                      Modelo de Cobrança
+                    </p>
+                    <p className="text-base font-bold text-[#0E1F66] mt-1.5 font-heading">
+                      Cota Fixa Mensal
+                    </p>
+                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
+                      Sem taxa de adesão ou fidelidade
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#0E1F66]/10 text-[#0E1F66] flex items-center justify-center font-bold text-lg">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* Detalhamento por Campanha Ativa */}
+          {stats?.financeiro?.detalhamentoCampanhas && stats.financeiro.detalhamentoCampanhas.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#E4E7EC] p-4 space-y-2">
+              <p className="text-xs font-bold text-[#344054]">Detalhamento das cotas ativas:</p>
+              <div className="divide-y divide-[#E4E7EC]">
+                {stats.financeiro.detalhamentoCampanhas.map((item) => (
+                  <div key={item.anuncioId} className="py-2 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-[#0E1F66] truncate">{item.titulo}</span>
+                      <span className="text-[#9AA3AF]">em</span>
+                      <span className="text-[#344054] truncate">
+                        {item.pontoNome} ({item.cidade})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                          item.tier === "Ouro"
+                            ? "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
+                            : item.tier === "Prata"
+                            ? "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]"
+                            : "bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74]"
+                        }`}
+                      >
+                        {item.tier}
+                      </span>
+                      <span className="font-bold text-[#1E4333]">
+                        {item.cotaMensal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* ── Campanhas ────────────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 font-heading">Minhas Campanhas</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Status de veiculação em cada ponto de TV</p>
+                <h3 className="font-bold text-[#0E1F66] font-heading">Minhas Campanhas</h3>
+                <p className="text-xs text-[#9AA3AF] mt-0.5">Status de veiculação em cada ponto de TV</p>
               </div>
               <Link href="/anunciante/mapa">
                 <Button variant="secondary" size="sm">Explorar Pontos</Button>
@@ -244,18 +409,18 @@ export default function AnuncianteDashboard() {
                 />
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[#E4E7EC]">
                 {anuncios.map((anuncio) => (
                   <div
                     key={anuncio.id}
-                    className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/70 transition"
+                    className="px-5 py-4 flex items-center gap-4 hover:bg-[#F7F8FA] transition"
                   >
                     {/* Thumbnail clicável para preview */}
                     <button
                       type="button"
                       onClick={() => setPreviewAd(anuncio)}
                       title="Clique para visualizar mídia"
-                      className="w-16 h-11 bg-slate-900 rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-16 h-11 bg-[#0E1F66] rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
                     >
                       {anuncio.tipoMidia === "VIDEO" ? (
                         <video src={anuncio.midiaUrl} muted className="w-full h-full object-cover" />
@@ -276,7 +441,7 @@ export default function AnuncianteDashboard() {
                         <button
                           type="button"
                           onClick={() => setPreviewAd(anuncio)}
-                          className="font-semibold text-slate-800 text-sm truncate hover:text-blue-600 transition text-left cursor-pointer"
+                          className="font-semibold text-[#0E1F66] text-sm truncate hover:text-[#4F93C9] transition text-left cursor-pointer"
                         >
                           {anuncio.titulo}
                         </button>
@@ -286,25 +451,25 @@ export default function AnuncianteDashboard() {
                           posicaoFila={anuncio.posicaoFila}
                         />
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">
+                      <p className="text-xs text-[#9AA3AF] mt-0.5 truncate">
                         {anuncio.pontoMidia.nomeEmpresa} · {anuncio.pontoMidia.cidade}/{anuncio.pontoMidia.uf}
                       </p>
 
                       {/* Métricas — só para ativos */}
                       {anuncio.status === "ATIVO" && (
                         <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[11px] text-slate-500">
-                            <strong className="text-slate-700">{anuncio.exibicoesHoje ?? 0}</strong> hoje
+                          <span className="text-[11px] text-[#344054]">
+                            <strong className="text-[#0E1F66]">{anuncio.exibicoesHoje ?? 0}</strong> hoje
                           </span>
-                          <span className="text-slate-200">·</span>
-                          <span className="text-[11px] text-slate-500">
-                            <strong className="text-slate-700">{anuncio.totalExibicoes ?? 0}</strong> total
+                          <span className="text-[#CBD5E1]">·</span>
+                          <span className="text-[11px] text-[#344054]">
+                            <strong className="text-[#0E1F66]">{anuncio.totalExibicoes ?? 0}</strong> total
                           </span>
                           {(anuncio.totalMinutosExibidos ?? 0) > 0 && (
                             <>
-                              <span className="text-slate-200">·</span>
-                              <span className="text-[11px] text-slate-500">
-                                <strong className="text-slate-700">{anuncio.totalMinutosExibidos}</strong> min no ar
+                              <span className="text-[#CBD5E1]">·</span>
+                              <span className="text-[11px] text-[#344054]">
+                                <strong className="text-[#0E1F66]">{anuncio.totalMinutosExibidos}</strong> min no ar
                               </span>
                             </>
                           )}
@@ -312,7 +477,7 @@ export default function AnuncianteDashboard() {
                       )}
 
                       {anuncio.status === "REJEITADO" && anuncio.motivoRejeicao && (
-                        <p className="text-[11px] text-red-600 mt-1 bg-red-50 px-2 py-0.5 rounded-lg border border-red-100 inline-block">
+                        <p className="text-[11px] text-rose-700 mt-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 inline-block">
                           {anuncio.motivoRejeicao}
                         </p>
                       )}
@@ -320,7 +485,7 @@ export default function AnuncianteDashboard() {
 
                     {/* Data e Ações */}
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] text-slate-400 hidden sm:block">
+                      <span className="text-[11px] text-[#9AA3AF] hidden sm:block">
                         {new Date(anuncio.criadoEm).toLocaleDateString("pt-BR")}
                       </span>
 
@@ -328,7 +493,7 @@ export default function AnuncianteDashboard() {
                         type="button"
                         title="Visualizar peça"
                         onClick={() => setPreviewAd(anuncio)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-[#4F93C9] hover:bg-[#4F93C9]/10 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -340,7 +505,7 @@ export default function AnuncianteDashboard() {
                         type="button"
                         title="Solicitar remoção desta campanha"
                         onClick={() => handleOpenRemovalModal(anuncio)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -382,34 +547,34 @@ export default function AnuncianteDashboard() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-[#F7F8FA] rounded-2xl border border-[#E4E7EC] text-xs">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Status</span>
                 <div className="mt-1">
                   <StatusPill status={previewAd.status} tvOnline={previewAd.pontoMidia.tvOnline} />
                 </div>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400">Duração</span>
-                <p className="font-bold text-slate-800 mt-1">{previewAd.duracaoSegundos} segundos</p>
+                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Duração</span>
+                <p className="font-bold text-[#0E1F66] mt-1">{previewAd.duracaoSegundos} segundos</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400">Exibições Hoje</span>
-                <p className="font-bold text-slate-800 mt-1">{previewAd.exibicoesHoje ?? 0}</p>
+                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Exibições Hoje</span>
+                <p className="font-bold text-[#0E1F66] mt-1">{previewAd.exibicoesHoje ?? 0}</p>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400">Total Exibições</span>
-                <p className="font-bold text-emerald-700 mt-1">{previewAd.totalExibicoes ?? 0}</p>
+                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Total Exibições</span>
+                <p className="font-bold text-[#1E4333] mt-1">{previewAd.totalExibicoes ?? 0}</p>
               </div>
             </div>
 
             {previewAd.status === "REJEITADO" && previewAd.motivoRejeicao && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
                 <strong>Motivo da Recusa:</strong> {previewAd.motivoRejeicao}
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-[#E4E7EC]">
               <Button
                 variant="secondary"
                 size="sm"
@@ -443,14 +608,14 @@ export default function AnuncianteDashboard() {
       >
         <div className="space-y-4">
           {requestError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
               {requestError}
             </div>
           )}
 
           {adToRequestRemoval && (
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
-              <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
+            <div className="p-3.5 bg-[#F7F8FA] border border-[#E4E7EC] rounded-2xl flex items-center gap-3.5">
+              <div className="w-14 h-10 bg-[#0E1F66] rounded-lg overflow-hidden shrink-0">
                 {adToRequestRemoval.tipoMidia === "VIDEO" ? (
                   <video src={adToRequestRemoval.midiaUrl} muted className="w-full h-full object-cover" />
                 ) : (
@@ -458,8 +623,8 @@ export default function AnuncianteDashboard() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-slate-900 text-sm truncate">{adToRequestRemoval.titulo}</p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="font-bold text-[#0E1F66] text-sm truncate">{adToRequestRemoval.titulo}</p>
+                <p className="text-xs text-[#9AA3AF] truncate">
                   Ponto: {adToRequestRemoval.pontoMidia.nomeEmpresa} ({adToRequestRemoval.pontoMidia.cidade})
                 </p>
               </div>
@@ -467,23 +632,23 @@ export default function AnuncianteDashboard() {
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Motivo da Solicitação <span className="text-red-500">*</span>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-1.5">
+              Motivo da Solicitação <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={3}
-              className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition"
+              className="w-full rounded-xl border border-[#E4E7EC] p-3 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
               placeholder="Explique o motivo para remoção (ex: encerramento antecipado da campanha, alteração de material, erro na veiculação...)"
               value={motivoRemocao}
               onChange={(e) => setMotivoRemocao(e.target.value)}
             />
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed bg-amber-50/70 p-3 rounded-xl border border-amber-200/70 text-amber-900">
+          <p className="text-xs text-[#92400E] leading-relaxed bg-[#FEF3C7] p-3 rounded-xl border border-[#FCD34D]">
             <strong>Informação importante:</strong> Apenas a administração pode excluir peças ativas da rede. Seu pedido será analisado pela equipe de moderação e a exclusão da mídia e desvinculação da TV serão processadas em seguida.
           </p>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E4E7EC]">
             <Button variant="ghost" onClick={() => setRemovalModalOpen(false)} disabled={requestingRemoval}>
               Cancelar
             </Button>

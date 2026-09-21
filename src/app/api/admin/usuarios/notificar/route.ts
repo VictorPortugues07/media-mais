@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ success: true, notificacao }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0].message }, { status: 400 });
+      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
     }
     console.error("Notificar usuario error:", error);
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });

@@ -68,7 +68,7 @@ export default function AnuncianteNotificacoesPage() {
     >
       <Card>
         <CardHeader>
-          <h3 className="font-bold text-slate-900 font-heading">Mensagens Recentes</h3>
+          <h3 className="font-bold text-[#0E1F66] font-heading">Mensagens Recentes</h3>
         </CardHeader>
         <CardBody className="p-0">
           {notifications.length === 0 ? (
@@ -79,23 +79,23 @@ export default function AnuncianteNotificacoesPage() {
               />
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#E4E7EC]">
               {notifications.map((n) => (
                 <div
                   key={n.id}
                   className={`p-5 flex items-start gap-4 transition ${
-                    !n.lida ? "bg-blue-50/40" : "hover:bg-slate-50"
+                    !n.lida ? "bg-[#4F93C9]/10" : "hover:bg-[#F7F8FA]"
                   }`}
                 >
                   <div
                     className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${
-                      !n.lida ? "bg-blue-600 ring-4 ring-blue-100" : "bg-slate-300"
+                      !n.lida ? "bg-[#4F93C9] ring-4 ring-[#4F93C9]/25" : "bg-[#CBD5E1]"
                     }`}
                   />
                   <div className="flex-1">
-                    <h4 className="text-sm font-bold text-slate-900">{n.titulo}</h4>
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">{n.mensagem}</p>
-                    <p className="text-[10px] text-slate-400 mt-2">
+                    <h4 className="text-sm font-bold text-[#0E1F66]">{n.titulo}</h4>
+                    <p className="text-xs text-[#344054] mt-1 leading-relaxed">{n.mensagem}</p>
+                    <p className="text-[10px] text-[#9AA3AF] mt-2">
                       {new Date(n.criadoEm).toLocaleString("pt-BR")}
                     </p>
                   </div>

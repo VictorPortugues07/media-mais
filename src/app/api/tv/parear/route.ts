@@ -1,27 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
-import { SignJWT, jwtVerify } from "jose";
-
-const PAIR_SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "mediamais_plataforma_secret_2026"
-);
-
-async function signTVToken(pontoId: number): Promise<string> {
-  return await new SignJWT({ pontoId, role: "TV_PLAYER" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("24h")
-    .setIssuedAt()
-    .sign(PAIR_SECRET);
-}
-
-async function verifyTVToken(token: string): Promise<number | null> {
-  try {
-    const { payload } = await jwtVerify(token, PAIR_SECRET);
-    return (payload as any).pontoId || null;
-  } catch {
-    return null;
-  }
-}
+import { signTVToken, verifyTVToken } from "@/lib/auth";
+import { processarExpiracaoAnuncios, filtroAnunciosAtivosNaoExpirados } from "@/lib/expiracao";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -65,10 +45,13 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: "Ponto não encontrado ou inativo" }, { status: 404 });
     }
 
+    // Processar e marcar anúncios expirados para liberar a grade da TV
+    await processarExpiracaoAnuncios(ponto.id);
+
     const anuncios = await prisma.anuncio.findMany({
       where: {
         pontoMidiaId: ponto.id,
-        status: "ATIVO",
+        ...filtroAnunciosAtivosNaoExpirados(),
       },
       select: {
         id: true,
@@ -83,7 +66,16 @@ export async function GET(request: NextRequest) {
       orderBy: { criadoEm: "asc" },
     });
 
-    return Response.json({ ponto, anuncios });
+    return Response.json(
+      { ponto, anuncios },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   }
 
   if (!codigo || codigo.length !== 6) {
@@ -149,11 +141,14 @@ export async function GET(request: NextRequest) {
     data: { ultimaAtividade: new Date() },
   });
 
-  // Busca anúncios ativos do ponto
+  // Processar e marcar anúncios expirados para liberar a grade da TV
+  await processarExpiracaoAnuncios(ponto.id);
+
+  // Busca anúncios estritamente ativos do ponto
   const anuncios = await prisma.anuncio.findMany({
     where: {
       pontoMidiaId: ponto.id,
-      status: "ATIVO",
+      ...filtroAnunciosAtivosNaoExpirados(),
     },
     select: {
       id: true,
@@ -168,9 +163,18 @@ export async function GET(request: NextRequest) {
     orderBy: { criadoEm: "asc" },
   });
 
-  return Response.json({
-    ponto,
-    anuncios,
-    token: pairToken,
-  });
+  return Response.json(
+    {
+      ponto,
+      anuncios,
+      token: pairToken,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    }
+  );
 }

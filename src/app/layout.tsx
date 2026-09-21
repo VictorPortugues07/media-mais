@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${inter.variable} ${sora.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-ink text-slate-900 font-sans">
+      <body className="min-h-full flex flex-col bg-ink text-[#344054] font-sans">
         {children}
       </body>
     </html>

@@ -48,19 +48,21 @@ enum TipoNotificacao {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  senha     String
-  nome      String
-  whatsapp  String
-  avatarUrl String?  @map("avatar_url")
-  role      UserRole
-  ativo     Boolean  @default(true)
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  senha        String
+  nome         String
+  whatsapp     String
+  avatarUrl    String?   @map("avatar_url")
+  role         UserRole
+  ativo        Boolean   @default(true)
+  deletadoEm   DateTime? @map("deletado_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @default(now()) @updatedAt @map("atualizado_em")
 
-  pontoMidia    PontoMidia?
-  anunciante    Anunciante?
-  notificacoes  Notificacao[]
+  pontoMidia   PontoMidia?
+  anunciante   Anunciante?
+  notificacoes Notificacao[]
 
   @@map("users")
 }
@@ -101,6 +103,14 @@ model PontoMidia {
   status               StatusPonto @default(PENDENTE)
   aceitaNovosAnuncios  Boolean     @default(true) @map("aceita_novos_anuncios")
   limiteTempoSegundos  Int         @default(360) @map("limite_tempo_segundos")
+  maxCotas             Int         @default(8) @map("max_cotas")
+  notaFluxo            Float?      @map("nota_fluxo")
+  notaTempo            Float?      @map("nota_tempo")
+  notaPerfil           Float?      @map("nota_perfil")
+  notaExclusividade    Float?      @map("nota_exclusividade")
+  scorePonderado       Float?      @map("score_ponderado")
+  tier                 String?
+  cotaMensal           Float?      @map("cota_mensal")
   ultimaAtividade      DateTime?   @map("ultima_atividade")
   tipoDispositivo      String?     @map("tipo_dispositivo")
   resolucaoTela        String?     @map("resolucao_tela")
@@ -114,6 +124,8 @@ model PontoMidia {
   @@index([cidade])
   @@index([status])
   @@index([codigoTv])
+  @@index([codigoRotativo])
+  @@index([ultimaAtividade])
   @@map("pontos_midia")
 }
 
@@ -165,6 +177,7 @@ model Anuncio {
   motivoRejeicao   String?       @map("motivo_rejeicao")
   dataInicio       DateTime?     @map("data_inicio")
   dataFim          DateTime?     @map("data_fim")
+  deletadoEm       DateTime?     @map("deletado_em")
   criadoEm         DateTime      @default(now()) @map("criado_em")
   atualizadoEm     DateTime      @updatedAt @map("atualizado_em")
 
@@ -175,6 +188,8 @@ model Anuncio {
   @@index([status])
   @@index([pontoMidiaId])
   @@index([anuncianteId])
+  @@index([pontoMidiaId, status])
+  @@index([dataFim])
   @@map("anuncios")
 }
 
@@ -186,12 +201,13 @@ model RegistroExibicao {
   tipoMidia       TipoMidia @map("tipo_midia")
   exibidoEm       DateTime  @default(now()) @map("exibido_em")
 
-  anuncio    Anuncio    @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
-  pontoMidia PontoMidia @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
+  anuncio    Anuncio    @relation(fields: [anuncioId], references: [id], onDelete: Restrict)
+  pontoMidia PontoMidia @relation(fields: [pontoMidiaId], references: [id], onDelete: Restrict)
 
   @@index([anuncioId])
   @@index([pontoMidiaId])
   @@index([exibidoEm])
+  @@index([pontoMidiaId, exibidoEm])
   @@map("registros_exibicao")
 }
 

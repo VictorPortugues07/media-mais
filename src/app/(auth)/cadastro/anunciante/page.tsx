@@ -158,23 +158,23 @@ export default function CadastroAnunciantePage() {
           <Link href="/" className="inline-flex justify-center transition-opacity hover:opacity-80">
             <Logo className="h-8 w-auto" />
           </Link>
-          <h2 className="mt-4 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-heading">
+          <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-[#0E1F66] font-heading">
             Cadastre-se como Anunciante
           </h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-600">
+          <p className="mt-1 text-xs sm:text-sm text-[#344054]">
             Anuncie seus produtos e serviços em telas de alta atenção na sua região
           </p>
         </div>
 
-        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm shadow-slate-900/5 border border-slate-200/80">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xs border border-[#E4E7EC]">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-medium text-red-700 flex flex-col gap-1">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs font-medium text-rose-700 flex flex-col gap-1">
                 <span>{error}</span>
                 {error.includes("Email ja cadastrado") && (
                   <Link
                     href="/login"
-                    className="text-blue-700 font-bold underline hover:text-blue-900 mt-1"
+                    className="text-[#4F93C9] font-bold underline hover:text-[#0E1F66] mt-1"
                   >
                     Clique aqui para fazer login com este e-mail →
                   </Link>
@@ -184,8 +184,8 @@ export default function CadastroAnunciantePage() {
 
             {/* Acesso */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px]">1</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">1</span>
                 Dados de Acesso
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -225,12 +225,12 @@ export default function CadastroAnunciantePage() {
               </div>
             </div>
 
-            <hr className="border-slate-100" />
+            <hr className="border-[#E4E7EC]" />
 
             {/* Empresa */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px]">2</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">2</span>
                 Informações da sua Empresa
               </h3>
               <div className="space-y-4">
@@ -337,12 +337,12 @@ export default function CadastroAnunciantePage() {
               </div>
             </div>
 
-            <hr className="border-slate-100" />
+            <hr className="border-[#E4E7EC]" />
 
             {/* O que pretende anunciar */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px]">3</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">3</span>
                 Objetivos de Divulgação
               </h3>
               <div className="space-y-4">
@@ -357,13 +357,13 @@ export default function CadastroAnunciantePage() {
                 />
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-1.5">
                     Descrição da Campanha / Oferta
                   </label>
                   <textarea
                     rows={3}
                     required
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                    className="w-full rounded-xl border border-[#E4E7EC] p-3 text-sm text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
                     placeholder="Explique o que gostaria de comunicar nas telas..."
                     value={form.descricaoAnuncio}
                     onChange={(e) =>
@@ -382,7 +382,7 @@ export default function CadastroAnunciantePage() {
                 />
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                     Tipos de Estabelecimentos de Interesse
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -395,8 +395,8 @@ export default function CadastroAnunciantePage() {
                           onClick={() => toggleCategoria(cat)}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                             selected
-                              ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                              ? "bg-[#4F93C9] text-white border-[#4F93C9] shadow-xs"
+                              : "bg-[#F7F8FA] text-[#344054] border-[#E4E7EC] hover:bg-slate-100"
                           }`}
                         >
                           {cat}
@@ -407,7 +407,7 @@ export default function CadastroAnunciantePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                     Faixa Etária Alvo
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -420,8 +420,8 @@ export default function CadastroAnunciantePage() {
                           onClick={() => toggleFaixaEtaria(faixa)}
                           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
                             selected
-                              ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                              ? "bg-[#4F93C9] text-white border-[#4F93C9] shadow-xs"
+                              : "bg-[#F7F8FA] text-[#344054] border-[#E4E7EC] hover:bg-slate-100"
                           }`}
                         >
                           {faixa}
@@ -444,9 +444,9 @@ export default function CadastroAnunciantePage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-xs text-[#9AA3AF]">
             Já possui uma conta?{" "}
-            <Link href="/login" className="text-blue-600 font-semibold hover:underline">
+            <Link href="/login" className="text-[#4F93C9] font-bold hover:text-[#0E1F66] transition">
               Fazer login
             </Link>
           </div>

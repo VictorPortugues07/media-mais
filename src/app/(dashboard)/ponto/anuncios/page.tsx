@@ -135,15 +135,15 @@ export default function PontoAnunciosPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900 font-heading">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Grade de Anúncios
-                <span className="ml-2 text-sm font-normal text-slate-400">({filteredAnuncios.length})</span>
+                <span className="ml-2 text-sm font-normal text-[#9AA3AF]">({filteredAnuncios.length})</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">{ativos} ativo(s) em loop na tela</p>
+              <p className="text-xs text-[#9AA3AF] mt-0.5">{ativos} ativo(s) em loop na tela</p>
             </div>
             <div className="flex items-center gap-2">
               <select
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 transition cursor-pointer"
+                className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-2.5 py-1.5 text-xs text-[#344054] outline-none focus:border-[#4F93C9] transition cursor-pointer"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
@@ -156,7 +156,7 @@ export default function PontoAnunciosPage() {
               <input
                 type="text"
                 placeholder="Buscar anúncio ou empresa..."
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-blue-400 outline-none w-48 transition"
+                className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] outline-none w-48 transition"
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
               >
@@ -173,20 +173,20 @@ export default function PontoAnunciosPage() {
               />
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#E4E7EC]">
               {filteredAnuncios.map((anuncio) => {
                 const st = statusConfig(anuncio.status);
                 return (
                   <div
                     key={anuncio.id}
-                    className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/60 transition"
+                    className="px-5 py-4 flex items-center gap-4 hover:bg-[#F7F8FA] transition"
                   >
                     {/* Thumbnail clicável */}
                     <button
                       type="button"
                       onClick={() => setPreviewAd(anuncio)}
                       title="Visualizar mídia"
-                      className="w-16 h-11 bg-slate-900 rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-16 h-11 bg-[#0E1F66] rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
                     >
                       {anuncio.tipoMidia === "VIDEO" ? (
                         <video src={anuncio.midiaUrl} muted className="w-full h-full object-cover" />
@@ -207,31 +207,31 @@ export default function PontoAnunciosPage() {
                         <button
                           type="button"
                           onClick={() => setPreviewAd(anuncio)}
-                          className="font-semibold text-slate-800 text-sm truncate hover:text-blue-600 transition text-left cursor-pointer"
+                          className="font-semibold text-[#0E1F66] text-sm truncate hover:text-[#4F93C9] transition text-left cursor-pointer"
                         >
                           {anuncio.titulo}
                         </button>
                         <Badge variant={st.variant}>{st.label}</Badge>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">
+                      <p className="text-xs text-[#9AA3AF] mt-0.5 truncate">
                         {anuncio.anunciante.nomeEmpresa} · {anuncio.tipoMidia === "VIDEO" ? `${anuncio.duracaoSegundos}s` : "Imagem"}
                       </p>
 
                       {/* Métricas compactas */}
                       {anuncio.status === "ATIVO" && (
                         <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[11px] text-slate-500">
-                            <strong className="text-slate-700">{anuncio.exibicoesHoje ?? 0}</strong> hoje
+                          <span className="text-[11px] text-[#344054]">
+                            <strong className="text-[#0E1F66]">{anuncio.exibicoesHoje ?? 0}</strong> hoje
                           </span>
-                          <span className="text-slate-200">·</span>
-                          <span className="text-[11px] text-slate-500">
-                            <strong className="text-slate-700">{anuncio.totalExibicoes ?? 0}</strong> total
+                          <span className="text-[#CBD5E1]">·</span>
+                          <span className="text-[11px] text-[#344054]">
+                            <strong className="text-[#0E1F66]">{anuncio.totalExibicoes ?? 0}</strong> total
                           </span>
                           {(anuncio.totalMinutosExibidos ?? 0) > 0 && (
                             <>
-                              <span className="text-slate-200">·</span>
-                              <span className="text-[11px] text-slate-500">
-                                <strong className="text-slate-700">{anuncio.totalMinutosExibidos}</strong> min
+                              <span className="text-[#CBD5E1]">·</span>
+                              <span className="text-[11px] text-[#344054]">
+                                <strong className="text-[#0E1F66]">{anuncio.totalMinutosExibidos}</strong> min
                               </span>
                             </>
                           )}
@@ -241,7 +241,7 @@ export default function PontoAnunciosPage() {
 
                     {/* Data e Ações */}
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] text-slate-400 hidden sm:block">
+                      <span className="text-[11px] text-[#9AA3AF] hidden sm:block">
                         {new Date(anuncio.criadoEm).toLocaleDateString("pt-BR")}
                       </span>
 
@@ -249,7 +249,7 @@ export default function PontoAnunciosPage() {
                         type="button"
                         title="Visualizar peça"
                         onClick={() => setPreviewAd(anuncio)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-[#4F93C9] hover:bg-[#4F93C9]/10 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -261,7 +261,7 @@ export default function PontoAnunciosPage() {
                         type="button"
                         title="Solicitar remoção deste anúncio da sua TV"
                         onClick={() => handleOpenRemovalModal(anuncio)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

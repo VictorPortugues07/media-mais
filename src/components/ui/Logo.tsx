@@ -18,11 +18,11 @@ export function Logo({
       />
       {showText && (
         <span
-          className={`font-bold tracking-tight text-lg sm:text-xl font-heading ${
-            whiteText ? "text-white" : "text-slate-900"
+          className={`font-black tracking-tight text-lg sm:text-xl font-heading ${
+            whiteText ? "text-white" : "text-[#0E1F66]"
           }`}
         >
-          Media<span className="text-blue-600"> +</span>
+          MEDIA<span className="text-[#4F93C9]">+</span>
         </span>
       )}
     </div>

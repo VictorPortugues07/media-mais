@@ -13,7 +13,7 @@ const anuncioSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
+  const session = await getSession(request);
   if (!session) {
     return Response.json({ error: "Nao autorizado" }, { status: 401 });
   }
@@ -29,20 +29,26 @@ export async function GET(request: NextRequest) {
     const anunciante = await prisma.anunciante.findUnique({
       where: { userId: session.userId },
     });
-    if (anunciante) where.anuncianteId = anunciante.id;
+    // Se o anunciante ainda não concluiu o perfil, não pode ver campanhas de terceiros
+    if (!anunciante) {
+      return Response.json({ anuncios: [] });
+    }
+    where.anuncianteId = anunciante.id;
   } else if (session.role === "PONTO") {
     const ponto = await prisma.pontoMidia.findUnique({
       where: { userId: session.userId },
     });
-    if (ponto) where.pontoMidiaId = ponto.id;
+    if (!ponto) {
+      return Response.json({ anuncios: [] });
+    }
+    where.pontoMidiaId = ponto.id;
+  } else if (session.role === "ADMIN") {
+    // Apenas administradores podem filtrar por ponto ou anunciante arbitrário
+    if (pontoId) where.pontoMidiaId = parseInt(pontoId);
+    if (anuncianteId) where.anuncianteId = parseInt(anuncianteId);
   }
-  // ADMIN sees all
 
   if (status) where.status = status;
-  if (pontoId) where.pontoMidiaId = parseInt(pontoId);
-  if (anuncianteId && session.role === "ADMIN") {
-    where.anuncianteId = parseInt(anuncianteId);
-  }
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -77,10 +83,10 @@ export async function GET(request: NextRequest) {
 
   const doisMinutosAtras = new Date(Date.now() - 2 * 60 * 1000);
 
-  // Buscar contagem de hoje e última exibição para cada anúncio
+  // Buscar contagem de hoje, última exibição e soma histórica real de segundos para cada anúncio
   const metricasAnuncios = await Promise.all(
     anuncios.map(async (a) => {
-      const [exibicoesHoje, ultimaExibicao] = await Promise.all([
+      const [exibicoesHoje, ultimaExibicao, duracaoTotalAgregada] = await Promise.all([
         prisma.registroExibicao.count({
           where: {
             anuncioId: a.id,
@@ -92,6 +98,10 @@ export async function GET(request: NextRequest) {
           orderBy: { exibidoEm: "desc" },
           select: { exibidoEm: true },
         }),
+        prisma.registroExibicao.aggregate({
+          where: { anuncioId: a.id },
+          _sum: { duracaoSegundos: true },
+        }),
       ]);
 
       const isOnline = a.pontoMidia.ultimaAtividade
@@ -99,7 +109,8 @@ export async function GET(request: NextRequest) {
         : false;
 
       const totalExibicoes = a._count.registroExibicoes;
-      const totalSegundos = totalExibicoes * a.duracaoSegundos;
+      // Usar a soma histórica real registrada em cada exibição
+      const totalSegundos = duracaoTotalAgregada._sum.duracaoSegundos ?? (totalExibicoes * a.duracaoSegundos);
       const totalMinutos = Math.round(totalSegundos / 60);
 
       // Se estiver na fila de espera, calcular a posição na fila daquele ponto
@@ -135,7 +146,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     if (!session || session.role !== "ANUNCIANTE") {
       return Response.json({ error: "Nao autorizado" }, { status: 401 });
     }
@@ -178,24 +189,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Calcular tempo ocupado pelos anúncios ATIVOS (loop de 6 minutos / limiteTempoSegundos)
-    const anunciosAtivos = await prisma.anuncio.findMany({
+    // 2. Calcular cotas ocupadas pelos anúncios ATIVOS (1 anunciante ativo = 1 cota)
+    const cotasOcupadas = await prisma.anuncio.count({
       where: {
         pontoMidiaId: ponto.id,
         status: "ATIVO",
       },
-      select: { duracaoSegundos: true },
     });
 
-    const tempoOcupadoAtual = anunciosAtivos.reduce(
-      (sum, item) => sum + (item.duracaoSegundos || 10),
-      0
-    );
-    const limiteLoop = ponto.limiteTempoSegundos || 360;
+    const maxCotas = ponto.maxCotas || 8;
     const duracaoDesejada = data.duracaoSegundos || (data.tipoMidia === "VIDEO" ? 15 : 10);
 
-    // Se ultrapassar o tempo limite do loop (6 min = 360s), entra na FILA_ESPERA
-    const vaiParaFilaEspera = tempoOcupadoAtual + duracaoDesejada > limiteLoop;
+    // Se atingir o limite de cotas do ponto, entra na FILA_ESPERA
+    const vaiParaFilaEspera = cotasOcupadas >= maxCotas;
     const statusInicial = vaiParaFilaEspera ? "FILA_ESPERA" : "PENDENTE";
 
     const anuncio = await prisma.anuncio.create({
@@ -224,7 +230,7 @@ export async function POST(request: NextRequest) {
           userId: session.userId,
           tipo: "FILA_ESPERA",
           titulo: "Anúncio na Fila de Espera",
-          mensagem: `A grade da TV "${ponto.nomeEmpresa}" está com a capacidade de 6 minutos preenchida (${tempoOcupadoAtual}s ocupados). Seu anúncio "${data.titulo}" entrou na fila de espera (Posição #${totalNaFila}) e será ativado assim que uma vaga abrir!`,
+          mensagem: `Todas as ${maxCotas} cotas da TV "${ponto.nomeEmpresa}" estão ocupadas (${cotasOcupadas}/${maxCotas}). Seu anúncio "${data.titulo}" entrou na fila de espera (Posição #${totalNaFila}) e será ativado assim que uma cota for liberada!`,
         },
       });
 
@@ -234,7 +240,7 @@ export async function POST(request: NextRequest) {
           userId: admin.id,
           tipo: "FILA_ESPERA" as const,
           titulo: "Novo anúncio na Fila de Espera",
-          mensagem: `"${data.titulo}" de ${anunciante.nomeEmpresa} entrou na fila de espera de ${ponto.nomeEmpresa} (Grade cheia: ${tempoOcupadoAtual}s/${limiteLoop}s).`,
+          mensagem: `"${data.titulo}" de ${anunciante.nomeEmpresa} entrou na fila de espera de ${ponto.nomeEmpresa} (Cotas cheias: ${cotasOcupadas}/${maxCotas}).`,
         })),
       });
     } else {
@@ -253,17 +259,17 @@ export async function POST(request: NextRequest) {
       {
         anuncio,
         vaiParaFilaEspera,
-        tempoOcupadoAtual,
-        limiteLoop,
+        cotasOcupadas,
+        maxCotas,
         mensagem: vaiParaFilaEspera
-          ? "Grade de 6 minutos preenchida. Seu anúncio foi adicionado à Fila de Espera com sucesso!"
+          ? "Cotas da TV preenchidas. Seu anúncio foi adicionado à Fila de Espera com sucesso!"
           : "Anúncio enviado para moderação com sucesso!",
       },
       { status: 201 }
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0].message }, { status: 400 });
+      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
     }
     console.error("Create anuncio error:", error);
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });

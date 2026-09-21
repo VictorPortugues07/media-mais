@@ -1,95 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { useNotifications, NotificationItem } from "@/context/NotificationContext";
 
-export interface NotificationItem {
-  id: number;
-  tipo: string;
-  titulo: string;
-  mensagem: string;
-  lida: boolean;
-  criadoEm: string;
-}
+export type { NotificationItem };
 
 export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADMIN" }) {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { unreadCount, notifications, loading, markAsRead, markAllAsRead } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/notificacoes");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notificacoes || []);
-        setUnreadCount(data.naoLidas || 0);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource("/api/notificacoes/stream");
-      eventSource.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.type === "update") {
-            setUnreadCount(data.naoLidas);
-            if (data.latest && data.latest.length > 0) {
-              setNotifications((prev) => {
-                const map = new Map();
-                data.latest.forEach((n: NotificationItem) => map.set(n.id, n));
-                prev.forEach((n) => {
-                  if (!map.has(n.id)) map.set(n.id, n);
-                });
-                return Array.from(map.values()).slice(0, 20);
-              });
-            }
-          }
-        } catch {
-          // ignore
-        }
-      };
-    } catch {
-      // ignore
-    }
-
-    return () => {
-      if (eventSource) eventSource.close();
-    };
-  }, []);
-
-  const markAsRead = async (id: number) => {
-    try {
-      await fetch(`/api/notificacoes/${id}/ler`, { method: "PATCH" });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      // ignore
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await fetch("/api/notificacoes?action=marcar-todas", { method: "PATCH" });
-      setNotifications((prev) => prev.map((n) => ({ ...n, lida: true })));
-      setUnreadCount(0);
-    } catch {
-      // ignore
-    }
-  };
 
   const notificacoesHref =
     role === "ADMIN"
@@ -119,7 +38,7 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
           />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs">
+          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#4F93C9] text-[10px] font-bold text-white shadow-xs">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -131,14 +50,14 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-xl border border-slate-100 py-2 z-50 animate-fade-in">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+          <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-xl border border-[#E4E7EC] py-2 z-50 animate-fade-in">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E4E7EC]">
               <div className="flex items-center gap-2">
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-[#0E1F66]">
                   Notificações
                 </h4>
                 {unreadCount > 0 && (
-                  <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                  <span className="bg-[#4F93C9]/15 text-[#0E1F66] text-xs px-2 py-0.5 rounded-full font-bold">
                     {unreadCount} nova{unreadCount > 1 ? "s" : ""}
                   </span>
                 )}
@@ -146,7 +65,7 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                  className="text-xs text-[#4F93C9] hover:text-[#0E1F66] font-semibold cursor-pointer"
                 >
                   Marcar todas lidas
                 </button>
@@ -167,23 +86,23 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
                   <div
                     key={n.id}
                     onClick={() => markAsRead(n.id)}
-                    className={`p-3.5 hover:bg-slate-50 cursor-pointer transition flex items-start gap-3 ${
-                      !n.lida ? "bg-blue-50/40" : ""
+                    className={`p-3.5 hover:bg-[#F7F8FA] cursor-pointer transition flex items-start gap-3 ${
+                      !n.lida ? "bg-[#4F93C9]/5" : ""
                     }`}
                   >
                     <div
                       className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                        !n.lida ? "bg-blue-600 ring-4 ring-blue-100" : "bg-transparent"
+                        !n.lida ? "bg-[#4F93C9] ring-4 ring-[#4F93C9]/20" : "bg-transparent"
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-800">
+                      <p className="text-xs font-bold text-[#0E1F66]">
                         {n.titulo}
                       </p>
-                      <p className="text-xs text-slate-600 mt-0.5 leading-relaxed break-words">
+                      <p className="text-xs text-[#344054] mt-0.5 leading-relaxed break-words">
                         {n.mensagem}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-1">
+                      <p className="text-[10px] text-[#9AA3AF] mt-1">
                         {new Date(n.criadoEm).toLocaleDateString("pt-BR", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -195,11 +114,11 @@ export function NotificationBell({ role }: { role: "PONTO" | "ANUNCIANTE" | "ADM
               )}
             </div>
 
-            <div className="px-4 py-2 border-t border-slate-100 text-center">
+            <div className="px-4 py-2 border-t border-[#E4E7EC] text-center">
               <Link
                 href={notificacoesHref}
                 onClick={() => setIsOpen(false)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                className="text-xs font-semibold text-[#4F93C9] hover:text-[#0E1F66]"
               >
                 Ver central completa →
               </Link>

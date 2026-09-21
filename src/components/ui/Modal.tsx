@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,9 @@ export interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
 }
 
+// Contador global para rastrear modais abertos simultaneamente e manter scroll lock estável
+let activeModalsCount = 0;
+
 export function Modal({
   isOpen,
   onClose,
@@ -21,18 +24,31 @@ export function Modal({
   children,
   size = "md",
 }: ModalProps) {
+  const titleId = useId();
+  const descId = useId();
+
   useEffect(() => {
+    if (!isOpen) return;
+
+    activeModalsCount++;
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "hidden";
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
     return () => {
-      document.body.style.overflow = "unset";
+      activeModalsCount = Math.max(0, activeModalsCount - 1);
+      // Só restaura a rolagem se não houver mais nenhum modal aberto
+      if (activeModalsCount === 0 && typeof document !== "undefined") {
+        document.body.style.overflow = "unset";
+      }
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -47,32 +63,44 @@ export function Modal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
+      aria-describedby={description ? descId : undefined}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+    >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#0E1F66]/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
       <div
         className={cn(
-          "relative w-full bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-10 animate-fade-in",
+          "relative w-full bg-white rounded-2xl shadow-xl border border-[#E4E7EC] overflow-hidden z-10 animate-fade-in",
           sizes[size]
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E4E7EC]">
           <div>
             {title && (
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 id={titleId} className="text-lg font-bold text-[#0E1F66] font-heading">
+                {title}
+              </h3>
             )}
             {description && (
-              <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+              <p id={descId} className="text-xs text-[#9AA3AF] mt-0.5">
+                {description}
+              </p>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+            aria-label="Fechar modal"
+            className="p-1 rounded-lg text-[#9AA3AF] hover:text-[#0E1F66] hover:bg-[#F7F8FA] transition cursor-pointer"
           >
             <svg
               className="w-5 h-5"

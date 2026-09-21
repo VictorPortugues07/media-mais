@@ -10,9 +10,10 @@ import { formatPhone } from "@/lib/utils";
 
 export default function AdminPerfilPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [form, setForm] = useState({
     nome: "",
@@ -22,29 +23,36 @@ export default function AdminPerfilPage() {
     senha: "",
   });
 
-  useEffect(() => {
-    async function loadAdminUser() {
-      try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            setForm({
-              nome: data.user.nome || "",
-              email: data.user.email || "",
-              whatsapp: formatPhone(data.user.whatsapp || ""),
-              avatarUrl: data.user.avatarUrl || "",
-              senha: "",
-            });
-          }
+  const loadAdminUser = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setForm({
+            nome: data.user.nome || "",
+            email: data.user.email || "",
+            whatsapp: formatPhone(data.user.whatsapp || ""),
+            avatarUrl: data.user.avatarUrl || "",
+            senha: "",
+          });
+          setLoadError(false);
+        } else {
+          setLoadError(true);
         }
-      } catch (err) {
-        console.error("Erro ao carregar dados do admin:", err);
-      } finally {
-        setLoading(false);
+      } else {
+        setLoadError(true);
       }
+    } catch (err) {
+      console.error("Erro ao carregar dados do admin:", err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadAdminUser();
   }, []);
 
@@ -84,6 +92,7 @@ export default function AdminPerfilPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loadError) return;
     setSaving(true);
     setMessage(null);
 
@@ -133,12 +142,32 @@ export default function AdminPerfilPage() {
     >
       <div className="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {loadError && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2 font-medium">
+                <svg className="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p>
+                  Falha ao carregar dados do administrador. A gravação foi bloqueada para proteger o cadastro.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadAdminUser}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0 cursor-pointer"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
+
           {message && (
             <div
               className={`p-4 rounded-2xl border text-sm font-semibold flex items-center gap-3 ${
                 message.type === "success"
                   ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  : "bg-red-50 text-red-800 border-red-200"
+                  : "bg-rose-50 text-rose-800 border-rose-200"
               }`}
             >
               <span>{message.type === "success" ? "✓" : "!"}</span>
@@ -146,22 +175,22 @@ export default function AdminPerfilPage() {
             </div>
           )}
 
-          <Card className="border-blue-100 shadow-sm">
-            <CardHeader className="bg-blue-50/40">
-              <h3 className="font-bold text-slate-900 font-heading">
+          <Card className="border-[#E4E7EC] shadow-xs">
+            <CardHeader className="bg-[#F7F8FA]">
+              <h3 className="font-bold text-[#0E1F66] font-heading">
                 Perfil do Administrador & Credenciais de Acesso
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#9AA3AF]">
                 Altere sua foto de perfil, dados de contato e senha de acesso ao painel
               </p>
             </CardHeader>
             <CardBody className="space-y-6">
               {/* Foto de Perfil */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Foto de Perfil do Usuário
                 </label>
-                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
                   <div className="relative">
                     {form.avatarUrl ? (
                       <img
@@ -179,14 +208,14 @@ export default function AdminPerfilPage() {
                   </div>
 
                   <div className="flex-1 text-center sm:text-left space-y-2">
-                    <p className="text-xs font-bold text-slate-800">
+                    <p className="text-xs font-bold text-[#0E1F66]">
                       {form.avatarUrl ? "Foto atual configurada" : "Nenhuma foto de perfil adicionada"}
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-[#9AA3AF]">
                       Recomendado: imagem quadrada (JPG, PNG ou WebP até 5MB)
                     </p>
                     <div className="flex items-center gap-2 justify-center sm:justify-start pt-1">
-                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer">
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#4F93C9] hover:bg-[#3D82B5] text-white font-bold text-xs shadow-xs transition cursor-pointer">
                         <input
                           type="file"
                           accept="image/*"
@@ -210,7 +239,7 @@ export default function AdminPerfilPage() {
                         <button
                           type="button"
                           onClick={removeAvatar}
-                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-red-50 hover:text-red-700 text-slate-700 font-semibold text-xs transition cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-700 font-semibold text-xs transition cursor-pointer"
                         >
                           Remover
                         </button>
@@ -221,7 +250,7 @@ export default function AdminPerfilPage() {
               </div>
 
               {/* Campos de Acesso */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#E4E7EC]">
                 <Input
                   label="Nome Completo"
                   required
@@ -251,8 +280,14 @@ export default function AdminPerfilPage() {
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
-                <Button variant="gradient" size="lg" loading={saving} type="submit">
+              <div className="pt-4 border-t border-[#E4E7EC] flex justify-end">
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  loading={saving}
+                  disabled={loading || saving || loadError}
+                  type="submit"
+                >
                   Salvar Alterações
                 </Button>
               </div>

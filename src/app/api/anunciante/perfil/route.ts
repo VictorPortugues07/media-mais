@@ -31,8 +31,8 @@ const perfilAnuncianteSchema = z.object({
   generoAlvo: z.string().min(1),
 });
 
-export async function GET() {
-  const session = await getSession();
+export async function GET(request: NextRequest) {
+  const session = await getSession(request);
   if (!session || (session.role !== "ANUNCIANTE" && session.role !== "ADMIN")) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
@@ -62,7 +62,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     if (!session || (session.role !== "ANUNCIANTE" && session.role !== "ADMIN")) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -90,47 +90,48 @@ export async function PUT(request: NextRequest) {
 
     if (data.senha && data.senha.trim().length >= 6) {
       const bcrypt = await import("bcryptjs");
-      userUpdateData.senha = await bcrypt.hash(data.senha, 10);
+      userUpdateData.senha = await bcrypt.hash(data.senha, 12);
     }
 
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: userUpdateData,
-    });
+    const updatedAnunciante = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: session.userId },
+        data: userUpdateData,
+      });
 
-    // 2. Atualizar dados do Anunciante
-    const updatedAnunciante = await prisma.anunciante.update({
-      where: { id: userAnunciante.id },
-      data: {
-        nomeEmpresa: data.nomeEmpresa,
-        responsavel: data.responsavel,
-        whatsapp: data.whatsapp,
-        instagramSite: data.instagramSite,
-        logoUrl: data.logoUrl,
-        fotos: data.fotos || userAnunciante.fotos,
-        cep: data.cep.replace(/\D/g, ""),
-        rua: data.rua,
-        numero: data.numero,
-        complemento: data.complemento,
-        bairro: data.bairro,
-        cidade: data.cidade,
-        uf: data.uf.toUpperCase(),
-        categoria: data.categoria,
-        oQueAnunciar: data.oQueAnunciar,
-        descricaoAnuncio: data.descricaoAnuncio,
-        preferenciaLocalizacao: data.preferenciaLocalizacao,
-        distanciaMaxima: data.distanciaMaxima,
-        bairrosEspecificos: data.bairrosEspecificos,
-        categoriasEspecificas: data.categoriasEspecificas,
-        faixaEtariaAlvo: data.faixaEtariaAlvo,
-        generoAlvo: data.generoAlvo,
-      },
+      return tx.anunciante.update({
+        where: { id: userAnunciante.id },
+        data: {
+          nomeEmpresa: data.nomeEmpresa,
+          responsavel: data.responsavel,
+          whatsapp: data.whatsapp,
+          instagramSite: data.instagramSite,
+          logoUrl: data.logoUrl,
+          fotos: data.fotos || userAnunciante.fotos,
+          cep: data.cep.replace(/\D/g, ""),
+          rua: data.rua,
+          numero: data.numero,
+          complemento: data.complemento,
+          bairro: data.bairro,
+          cidade: data.cidade,
+          uf: data.uf.toUpperCase(),
+          categoria: data.categoria,
+          oQueAnunciar: data.oQueAnunciar,
+          descricaoAnuncio: data.descricaoAnuncio,
+          preferenciaLocalizacao: data.preferenciaLocalizacao,
+          distanciaMaxima: data.distanciaMaxima,
+          bairrosEspecificos: data.bairrosEspecificos,
+          categoriasEspecificas: data.categoriasEspecificas,
+          faixaEtariaAlvo: data.faixaEtariaAlvo,
+          generoAlvo: data.generoAlvo,
+        },
+      });
     });
 
     return Response.json({ success: true, anunciante: updatedAnunciante });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0].message }, { status: 400 });
+      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
     }
     console.error("Update perfil anunciante error:", error);
     return Response.json({ error: "Erro interno ao atualizar perfil" }, { status: 500 });

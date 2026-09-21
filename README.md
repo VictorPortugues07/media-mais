@@ -89,8 +89,7 @@ O sistema opera com autenticação JWT baseada em cookies seguros (`mm_session`)
 - `/login` — Tela de autenticação unificada com redirecionamento automático por perfil.
 - `/cadastro/anunciante` — Formulário de registro para marcas e empresas anunciantes.
 - `/cadastro/ponto` — Formulário de registro para estabelecimentos que possuem televisores.
-- `/player` — Player oficial da Smart TV (tela de digitação por controle remoto e exibição em tela cheia).
-- `/tv/[pontoId]` — Canal de transmissão direto (protegido por sessão do proprietário ou admin).
+- `/player` — Player oficial da Smart TV (tela de digitação por controle remoto, pareamento por código e exibição em tela cheia).
 
 ### Painel do Anunciante (`/anunciante/*`) <a id="painel-do-anunciante"></a>
 - `/anunciante/dashboard` — Métricas de campanhas ativas, em moderação, rejeitadas e total de exibições.
@@ -126,7 +125,6 @@ O sistema opera com autenticação JWT baseada em cookies seguros (`mm_session`)
 - `GET /api/tv/parear` — Valida o código numérico de 6 dígitos, gera o `pairToken` e entrega a playlist. Com `token`, entrega atualizações seguras de playlist.
 - `POST /api/tv/telemetria` — Recebe heartbeat (a cada 4s), registro de exibição finalizada (*Proof of Play*) ou sinal de `offline: true` (via `navigator.sendBeacon` ao fechar a tela).
 - `POST /api/ponto/codigo-rotativo` — Gera e armazena novo código temporário de 6 dígitos com expiração de 30s.
-- `GET /api/tv/[pontoId]` — Canal protegido para visualização da grade pelo proprietário ou administrador.
 
 #### Campanhas & Anúncios
 - `GET /api/anuncios` — Lista anúncios filtrados por perfil do usuário logado.

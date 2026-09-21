@@ -35,8 +35,8 @@ const perfilPontoSchema = z.object({
   fotos: z.array(z.string()).optional(),
 });
 
-export async function GET() {
-  const session = await getSession();
+export async function GET(request: NextRequest) {
+  const session = await getSession(request);
   if (!session || (session.role !== "PONTO" && session.role !== "ADMIN")) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
@@ -66,7 +66,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     if (!session || (session.role !== "PONTO" && session.role !== "ADMIN")) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -94,13 +94,8 @@ export async function PUT(request: NextRequest) {
 
     if (data.senha && data.senha.trim().length >= 6) {
       const bcrypt = await import("bcryptjs");
-      userUpdateData.senha = await bcrypt.hash(data.senha, 10);
+      userUpdateData.senha = await bcrypt.hash(data.senha, 12);
     }
-
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: userUpdateData,
-    });
 
     // 2. Geocodificar se endereço mudou
     let geo = { lat: userPonto.lat, lng: userPonto.lng };
@@ -127,44 +122,51 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // 3. Atualizar dados do Ponto
-    const updatedPonto = await prisma.pontoMidia.update({
-      where: { id: userPonto.id },
-      data: {
-        nomeEmpresa: data.nomeEmpresa,
-        responsavel: data.responsavel,
-        whatsapp: data.whatsapp,
-        instagramSite: data.instagramSite,
-        cep: data.cep.replace(/\D/g, ""),
-        rua: data.rua,
-        numero: data.numero,
-        complemento: data.complemento,
-        bairro: data.bairro,
-        cidade: data.cidade,
-        uf: data.uf.toUpperCase(),
-        categoria: data.categoria,
-        descricao: data.descricao,
-        possuiTv: data.possuiTv,
-        quantidadeTvs: data.quantidadeTvs,
-        localInstalacao: data.localInstalacao,
-        fluxoDiarioEstimado: data.fluxoDiarioEstimado,
-        tempoPermanencia: data.tempoPermanencia,
-        faixaEtariaPublico: data.faixaEtariaPublico,
-        generoPublico: data.generoPublico,
-        horariosPico: data.horariosPico,
-        horarioAbertura: data.horarioAbertura || userPonto.horarioAbertura,
-        horarioFechamento: data.horarioFechamento || userPonto.horarioFechamento,
-        diasFuncionamento: data.diasFuncionamento || userPonto.diasFuncionamento,
-        fotos: data.fotos || userPonto.fotos,
-        lat: geo.lat,
-        lng: geo.lng,
-      },
+    // Executar atualização de usuário e ponto atomicamente em transação
+    const updatedPonto = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: session.userId },
+        data: userUpdateData,
+      });
+
+      return tx.pontoMidia.update({
+        where: { id: userPonto.id },
+        data: {
+          nomeEmpresa: data.nomeEmpresa,
+          responsavel: data.responsavel,
+          whatsapp: data.whatsapp,
+          instagramSite: data.instagramSite,
+          cep: data.cep.replace(/\D/g, ""),
+          rua: data.rua,
+          numero: data.numero,
+          complemento: data.complemento,
+          bairro: data.bairro,
+          cidade: data.cidade,
+          uf: data.uf.toUpperCase(),
+          categoria: data.categoria,
+          descricao: data.descricao,
+          possuiTv: data.possuiTv,
+          quantidadeTvs: data.quantidadeTvs,
+          localInstalacao: data.localInstalacao,
+          fluxoDiarioEstimado: data.fluxoDiarioEstimado,
+          tempoPermanencia: data.tempoPermanencia,
+          faixaEtariaPublico: data.faixaEtariaPublico,
+          generoPublico: data.generoPublico,
+          horariosPico: data.horariosPico,
+          horarioAbertura: data.horarioAbertura || userPonto.horarioAbertura,
+          horarioFechamento: data.horarioFechamento || userPonto.horarioFechamento,
+          diasFuncionamento: data.diasFuncionamento || userPonto.diasFuncionamento,
+          fotos: data.fotos || userPonto.fotos,
+          lat: geo.lat,
+          lng: geo.lng,
+        },
+      });
     });
 
     return Response.json({ success: true, ponto: updatedPonto });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0].message }, { status: 400 });
+      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
     }
     console.error("Update perfil ponto error:", error);
     return Response.json({ error: "Erro interno ao atualizar perfil" }, { status: 500 });

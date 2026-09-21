@@ -23,7 +23,7 @@ export function TVFrame({
   const [time, setTime] = useState<string>("");
 
   useEffect(() => {
-    // 1. Gerar relógio em tempo real para a TV
+    // 1. Gerar relógio em tempo real para a TV (atualiza a cada 15s para economizar ciclos de CPU em Smart TVs)
     const updateTime = () => {
       const now = new Date();
       setTime(
@@ -34,7 +34,7 @@ export function TVFrame({
       );
     };
     updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(updateTime, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -60,9 +60,9 @@ export function TVFrame({
   }, [pontoId]);
 
   return (
-    <div className="w-screen h-screen bg-[#051160] flex flex-col justify-between overflow-hidden select-none font-sans relative">
+    <div className="w-screen h-screen bg-[#0E1F66] flex flex-col justify-between overflow-hidden select-none font-sans relative">
       {/* Top Bar Discreta da TV */}
-      <header className="h-14 sm:h-16 px-6 sm:px-10 flex items-center justify-between bg-gradient-to-b from-[#030b3d] to-transparent z-20">
+      <header className="h-14 sm:h-16 px-6 sm:px-10 flex items-center justify-between bg-gradient-to-b from-[#081342] to-transparent z-20">
         <div className="flex items-center gap-3">
           <Logo className="h-6 sm:h-7 w-auto" whiteText={true} />
           <span className="h-3.5 w-px bg-white/20" />
@@ -72,8 +72,8 @@ export function TVFrame({
         </div>
 
         <div className="flex items-center gap-4 text-xs font-semibold text-white/90">
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-blue-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-[#8FAE9E]">
+            <span className="w-2 h-2 rounded-full bg-[#8FAE9E] animate-pulse" />
             Transmissão Ao Vivo
           </span>
           <span className="text-sm sm:text-base font-bold font-mono tracking-wider text-blue-100">
@@ -95,11 +95,13 @@ export function TVFrame({
       </main>
 
       {/* Barra Inferior Comercial Inteligente (Moldura de Conversão Media+) */}
-      <footer className="h-20 sm:h-24 px-6 sm:px-10 flex items-center justify-between bg-gradient-to-t from-[#030b3d] via-[#051160]/90 to-transparent z-20">
+      <footer className="h-20 sm:h-24 px-6 sm:px-10 flex items-center justify-between bg-gradient-to-t from-[#081342] via-[#0E1F66]/90 to-transparent z-20">
         {/* Chamada Comercial */}
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-400 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">
-            📢
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0E1F66] to-[#4F93C9] text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0 border border-white/10">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+            </svg>
           </div>
           <div>
             <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight font-heading">
@@ -107,8 +109,8 @@ export function TVFrame({
             </h4>
             <p className="text-[11px] sm:text-xs text-blue-200/80 mt-0.5 flex items-center gap-2">
               <span>Anuncie para clientes da região</span>
-              <span className="w-1 h-1 rounded-full bg-blue-400" />
-              <span className="font-bold text-emerald-400 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-[#4F93C9]" />
+              <span className="font-bold text-[#8FAE9E] flex items-center gap-1">
                 WhatsApp: (48) 98879-6514
               </span>
             </p>

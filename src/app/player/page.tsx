@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { TVFrame } from "@/components/tv/TVFrame";
 import { Logo } from "@/components/ui/Logo";
+import { PlayerErrorBoundary } from "@/components/tv/PlayerErrorBoundary";
 
 interface TVAnuncio {
   id: number;
@@ -25,6 +26,14 @@ interface PontoInfo {
 }
 
 export default function StandaloneTVPlayerPage() {
+  return (
+    <PlayerErrorBoundary>
+      <StandaloneTVPlayerInner />
+    </PlayerErrorBoundary>
+  );
+}
+
+function StandaloneTVPlayerInner() {
   const [pairedCode, setPairedCode] = useState<string>("");
   const [pairToken, setPairToken] = useState<string>("");
   const [codeDigits, setCodeDigits] = useState<string[]>(["", "", "", "", "", ""]);
@@ -32,6 +41,8 @@ export default function StandaloneTVPlayerPage() {
   const [ponto, setPonto] = useState<PontoInfo | null>(null);
   const [anuncios, setAnuncios] = useState<TVAnuncio[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [cycleCount, setCycleCount] = useState(0);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,6 +53,15 @@ export default function StandaloneTVPlayerPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const errorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isHandlingErrorRef = useRef(false);
+  const lastTelemetryTimeRef = useRef(0);
+  const anunciosRef = useRef<TVAnuncio[]>(anuncios);
+  const isSyncingRef = useRef(false);
+
+  useEffect(() => {
+    anunciosRef.current = anuncios;
+  }, [anuncios]);
 
   // Detectar tipo de dispositivo, hardware de Smart TV e resolução
   const getDeviceInfo = () => {
@@ -179,17 +199,22 @@ export default function StandaloneTVPlayerPage() {
 
       setPonto(data.ponto);
       setAnuncios(data.anuncios || []);
+      anunciosRef.current = data.anuncios || [];
       setPairedCode(code);
       setPairToken(data.token || "");
       setLoading(false);
 
-      // Envia heartbeat imediato para atualizar status no painel instantaneamente
+      // Envia heartbeat imediato para atualizar status no painel instantaneamente com token
       const deviceInfo = getDeviceInfo();
       fetch("/api/tv/telemetria", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-tv-token": data.token || "",
+        },
         body: JSON.stringify({
           pontoId: data.ponto.id,
+          token: data.token || "",
           heartbeatOnly: true,
           deviceType: deviceInfo.deviceType,
           screenResolution: deviceInfo.screenResolution,
@@ -199,6 +224,7 @@ export default function StandaloneTVPlayerPage() {
       const msg = err instanceof Error ? err.message : "Código inválido ou expirado";
       setErrorMessage(msg);
       setPairedCode("");
+      setPairToken("");
       setCodeDigits(["", "", "", "", "", ""]);
       digitInputRefs.current[0]?.focus();
       setActiveDigitIndex(0);
@@ -208,16 +234,67 @@ export default function StandaloneTVPlayerPage() {
     }
   };
 
+  // Comparação profunda de playlist para evitar re-renderizações desnecessárias
+  const hasPlaylistChanged = (oldList: TVAnuncio[], newList: TVAnuncio[]): boolean => {
+    if (oldList.length !== newList.length) return true;
+    for (let i = 0; i < oldList.length; i++) {
+      const o = oldList[i];
+      const n = newList[i];
+      if (!o || !n) return true;
+      if (
+        o.id !== n.id ||
+        o.midiaUrl !== n.midiaUrl ||
+        o.duracaoSegundos !== n.duracaoSegundos ||
+        o.tipoMidia !== n.tipoMidia
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Sincronização inteligente em segundo plano no fim de cada loop
+  // Atualiza novos vídeos/imagens sem piscar a tela e sem recarregar a página
+  const syncPlaylistInBackground = async () => {
+    if (!ponto?.id || !pairToken || isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    try {
+      const res = await fetch(
+        `/api/tv/parear?pontoId=${ponto.id}&token=${encodeURIComponent(pairToken)}&_t=${Date.now()}`,
+        {
+          headers: { "x-tv-token": pairToken },
+          cache: "no-store",
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const novasCampanhas: TVAnuncio[] = data.anuncios || [];
+        if (hasPlaylistChanged(anunciosRef.current, novasCampanhas)) {
+          console.log(
+            `[Player] Nova mídia detectada no final do loop! Inserindo ${novasCampanhas.length} anúncio(s) na grade.`
+          );
+          anunciosRef.current = novasCampanhas;
+          setAnuncios(novasCampanhas);
+          setCurrentIndex((curr) => (curr >= novasCampanhas.length ? 0 : curr));
+        }
+      }
+    } catch (err) {
+      console.error("[Player] Falha na checagem silenciosa da playlist:", err);
+    } finally {
+      isSyncingRef.current = false;
+    }
+  };
+
   // 3. Polling para sincronizar novas campanhas e telemetria / heartbeat contínuo
   useEffect(() => {
-    if (!ponto?.id) return;
+    if (!ponto?.id || !pairToken) return;
 
     // Notificar desconexão imediata ao fechar a janela / sair do player
     const handleUnload = () => {
-      if (ponto?.id) {
+      if (ponto?.id && pairToken) {
         navigator.sendBeacon?.(
-          "/api/tv/telemetria",
-          JSON.stringify({ pontoId: ponto.id, offline: true })
+          `/api/tv/telemetria?token=${encodeURIComponent(pairToken)}`,
+          JSON.stringify({ pontoId: ponto.id, token: pairToken, offline: true })
         );
       }
     };
@@ -230,9 +307,13 @@ export default function StandaloneTVPlayerPage() {
         const deviceInfo = getDeviceInfo();
         await fetch("/api/tv/telemetria", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-tv-token": pairToken,
+          },
           body: JSON.stringify({
             pontoId: ponto.id,
+            token: pairToken,
             heartbeatOnly: true,
             deviceType: deviceInfo.deviceType,
             screenResolution: deviceInfo.screenResolution,
@@ -243,20 +324,12 @@ export default function StandaloneTVPlayerPage() {
       }
     }, 4000);
 
-    // Polling de sincronização de anúncios a cada 15 segundos
-    const syncInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/tv/parear?pontoId=${ponto.id}&token=${encodeURIComponent(pairToken)}`, {
-          headers: pairToken ? { "x-tv-token": pairToken } : {},
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAnuncios(data.anuncios || []);
-        }
-      } catch (err) {
-        console.error("Polling error:", err);
+    // Polling de fallback em segundo plano (caso a tela esteja ociosa ou sem anúncios)
+    const syncInterval = setInterval(() => {
+      if (pageVisible) {
+        syncPlaylistInBackground();
       }
-    }, 15000);
+    }, 30000);
 
     return () => {
       window.removeEventListener("beforeunload", handleUnload);
@@ -265,9 +338,15 @@ export default function StandaloneTVPlayerPage() {
     };
   }, [ponto?.id, pageVisible, pairToken]);
 
-  // 4. Registro de telemetria ao rodar anúncio
+  // 4. Registro de telemetria ao rodar anúncio (com token de TV pareada)
   const registrarExibicao = async (ad: TVAnuncio) => {
-    if (!ponto?.id) return;
+    if (!ponto?.id || !pairToken) return;
+
+    const now = Date.now();
+    // Proteção contra bursts e telemetria disparada em intervalos inválidos (mínimo de 3s)
+    if (now - lastTelemetryTimeRef.current < 3000) return;
+    lastTelemetryTimeRef.current = now;
+
     try {
       const deviceInfo = getDeviceInfo();
       // Não registrar Proof-of-Play se for celular/dispositivo móvel não autorizado
@@ -275,9 +354,13 @@ export default function StandaloneTVPlayerPage() {
 
       await fetch("/api/tv/telemetria", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-tv-token": pairToken,
+        },
         body: JSON.stringify({
           pontoId: ponto.id,
+          token: pairToken,
           anuncioId: ad.id,
           duracaoSegundos: ad.duracaoSegundos || 10,
           tipoMidia: ad.tipoMidia,
@@ -292,34 +375,76 @@ export default function StandaloneTVPlayerPage() {
   };
 
   // 5. Rotação de anúncios contínua e resiliente (suporta 1 único anúncio ou múltiplos em loop)
-  const nextAd = () => {
+  const nextAd = (fromError = false) => {
     if (anuncios.length === 0) return;
-    const currentAd = anuncios[currentIndex];
-    if (currentAd) {
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    isHandlingErrorRef.current = false;
+
+    const currentList = anunciosRef.current.length > 0 ? anunciosRef.current : anuncios;
+    const isEndOfLoop = currentList.length <= 1 || currentIndex + 1 >= currentList.length;
+
+    // Mini recarregada em segundo plano no término do loop para checar e inserir novos vídeos automaticamente sem piscar
+    if (isEndOfLoop) {
+      syncPlaylistInBackground();
+    }
+
+    const currentAd = currentList[currentIndex] || currentList[0];
+    // Registra telemetria apenas quando a exibição foi completada com sucesso (sem erro)
+    if (currentAd && !fromError) {
       registrarExibicao(currentAd);
     }
 
-    if (anuncios.length === 1) {
+    setCycleCount((c) => c + 1);
+
+    if (currentList.length === 1) {
       // Se tiver só 1 vídeo ou imagem, reinicia ele sem travar
-      if (currentAd.tipoMidia === "VIDEO" && videoRef.current) {
+      if (currentAd?.tipoMidia === "VIDEO" && videoRef.current) {
         videoRef.current.currentTime = 0;
-        videoRef.current.muted = false;
-        videoRef.current.volume = 1;
         videoRef.current.play().catch(() => {});
-      } else {
-        // Imagem única: aciona timeout novamente
-        setCurrentIndex(0);
       }
     } else {
-      setCurrentIndex((prev) => (prev + 1) % anuncios.length);
+      setCurrentIndex((prev) => (prev + 1) % currentList.length);
     }
   };
 
+  const handleMediaError = (adTitle: string, adId: number) => {
+    // Evita loop de erros repetidos disparados pelo elemento de mídia do navegador
+    if (isHandlingErrorRef.current) return;
+    isHandlingErrorRef.current = true;
+
+    console.warn(`[Player] Falha ao reproduzir anúncio "${adTitle}" (ID: ${adId}). Pulando com segurança...`);
+
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+    }
+
+    errorTimerRef.current = setTimeout(() => {
+      nextAd(true);
+    }, 2000);
+  };
+
   useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    isHandlingErrorRef.current = false;
+
     if (anuncios.length === 0 || !ponto) return;
 
-    const currentAd = anuncios[currentIndex];
+    const currentAd = anuncios[currentIndex] || anuncios[0];
     if (!currentAd) {
       setCurrentIndex(0);
       return;
@@ -328,20 +453,27 @@ export default function StandaloneTVPlayerPage() {
     if (currentAd.tipoMidia === "IMAGEM") {
       const durationMs = (currentAd.duracaoSegundos || 10) * 1000;
       timerRef.current = setTimeout(() => {
-        nextAd();
+        nextAd(false);
       }, durationMs);
     } else if (currentAd.tipoMidia === "VIDEO") {
       // Timeout de segurança caso o evento 'onEnded' do vídeo falhe no navegador da Smart TV
       const maxVideoDurationMs = ((currentAd.duracaoSegundos || 60) + 3) * 1000;
       timerRef.current = setTimeout(() => {
-        nextAd();
+        nextAd(false);
       }, maxVideoDurationMs);
     }
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
+      }
     };
-  }, [currentIndex, anuncios, ponto]);
+  }, [currentIndex, cycleCount, anuncios, ponto]);
 
   // Teclado numérico / input handlers com suporte a controle remoto de Smart TV
   const handleVirtualKey = (num: string) => {
@@ -405,22 +537,28 @@ export default function StandaloneTVPlayerPage() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [ponto, codeDigits, connecting]);
 
-  const desconectarTV = () => {
-    if (confirm("Deseja desconectar esta TV e voltar para a tela de digitação do código?")) {
-      if (ponto?.id) {
-        fetch("/api/tv/telemetria", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pontoId: ponto.id, offline: true }),
-        }).catch(() => {});
-      }
-      setPairedCode("");
-      setPairToken("");
-      setPonto(null);
-      setAnuncios([]);
-      setCodeDigits(["", "", "", "", "", ""]);
-      setActiveDigitIndex(0);
+  const executarDesconexao = () => {
+    if (ponto?.id && pairToken) {
+      fetch("/api/tv/telemetria", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tv-token": pairToken,
+        },
+        body: JSON.stringify({ pontoId: ponto.id, token: pairToken, offline: true }),
+      }).catch(() => {});
     }
+    setPairedCode("");
+    setPairToken("");
+    setPonto(null);
+    setAnuncios([]);
+    setCodeDigits(["", "", "", "", "", ""]);
+    setActiveDigitIndex(0);
+    setShowDisconnectModal(false);
+  };
+
+  const desconectarTV = () => {
+    setShowDisconnectModal(true);
   };
 
   const toggleFullScreen = () => {
@@ -436,10 +574,10 @@ export default function StandaloneTVPlayerPage() {
   // Se estiver carregando verificação inicial
   if (loading) {
     return (
-      <div className="w-screen h-screen bg-[#051160] flex flex-col items-center justify-center text-white">
-        <div className="w-14 h-14 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4" />
+      <div className="w-screen h-screen bg-[#0E1F66] flex flex-col items-center justify-center text-white">
+        <div className="w-14 h-14 border-4 border-[#4F93C9] border-t-transparent rounded-full animate-spin mb-4" />
         <Logo className="h-8 w-auto mb-3" whiteText />
-        <p className="text-xs font-bold tracking-widest uppercase text-blue-200">
+        <p className="text-xs font-bold tracking-widest uppercase text-white/80">
           Iniciando Player Media+...
         </p>
       </div>
@@ -449,11 +587,11 @@ export default function StandaloneTVPlayerPage() {
   // BLOQUEIO: Dispositivo mobile detectado
   if (isMobileDevice) {
     return (
-      <div className="w-screen min-h-screen bg-[#030930] flex flex-col items-center justify-center p-6 text-white select-none">
+      <div className="w-screen min-h-screen bg-[#081342] flex flex-col items-center justify-center p-6 text-white select-none">
         <div className="w-full max-w-md flex flex-col items-center text-center">
           <Logo className="h-10 w-auto mb-6" whiteText />
 
-          <div className="bg-[#07154a]/90 backdrop-blur-xl border border-amber-500/30 p-8 rounded-3xl shadow-2xl w-full">
+          <div className="bg-[#0E1F66]/95 backdrop-blur-xl border border-amber-500/30 p-8 rounded-3xl shadow-2xl w-full">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center text-3xl mx-auto mb-4">
               &#128249;
             </div>
@@ -463,7 +601,7 @@ export default function StandaloneTVPlayerPage() {
             <p className="text-xs text-amber-200/80 mt-3 leading-relaxed">
               Este player foi desenvolvido exclusivamente para ser exibido em Smart TVs e monitores de grande formato.
             </p>
-            <p className="text-xs text-blue-200/60 mt-2 leading-relaxed">
+            <p className="text-xs text-blue-100/70 mt-2 leading-relaxed">
               Para conectar sua TV, acesse este link diretamente no navegador da sua Smart TV e digite o codigo de 6 digitos gerado no seu painel.
             </p>
 
@@ -484,23 +622,26 @@ export default function StandaloneTVPlayerPage() {
   // TELA 1: Pareamento por Código Numérico
   if (!ponto) {
     return (
-      <div className="w-screen min-h-screen bg-[#030930] flex flex-col items-center justify-center p-6 text-white select-none">
+      <div className="w-screen min-h-screen bg-[#081342] flex flex-col items-center justify-center p-6 text-white select-none">
         <div className="w-full max-w-xl flex flex-col items-center text-center">
           <Logo className="h-10 sm:h-12 w-auto mb-6" whiteText />
 
-          <div className="bg-[#07154a]/90 backdrop-blur-xl border border-blue-500/30 p-8 sm:p-10 rounded-3xl shadow-2xl w-full">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30 mb-3">
-              📺 Conectar Nova TV
+          <div className="bg-[#0E1F66]/95 backdrop-blur-xl border border-[#4F93C9]/30 p-8 sm:p-10 rounded-3xl shadow-2xl w-full">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#4F93C9]/20 text-[#8ec3ea] border border-[#4F93C9]/30 mb-3">
+              <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>Conectar Nova TV</span>
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
               Digite o Código da Sua TV
             </h1>
-            <p className="text-xs sm:text-sm text-blue-200/70 mt-2 max-w-md mx-auto">
+            <p className="text-xs sm:text-sm text-blue-100/80 mt-2 max-w-md mx-auto">
               Abra o painel do seu estabelecimento no celular ou computador e digite o código de 6 números gerado para sua tela.
             </p>
 
             {errorMessage && (
-              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/40 rounded-2xl text-xs font-bold text-red-300">
+              <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-2xl text-xs font-bold text-rose-300">
                 {errorMessage}
               </div>
             )}
@@ -515,10 +656,10 @@ export default function StandaloneTVPlayerPage() {
                     onClick={() => setActiveDigitIndex(idx)}
                     className={`w-12 h-16 sm:w-16 sm:h-22 text-3xl sm:text-4xl font-black font-mono flex items-center justify-center rounded-2xl border-2 transition-all cursor-pointer ${
                       digit
-                        ? "bg-blue-600 text-white border-blue-400 shadow-xl shadow-blue-500/30 scale-100"
+                        ? "bg-[#4F93C9] text-white border-white shadow-xl shadow-[#4F93C9]/40 scale-100"
                         : isCurrent
-                        ? "bg-blue-950/90 text-blue-200 border-sky-400 ring-4 ring-sky-400/30 animate-pulse"
-                        : "bg-[#040c30] text-blue-300/40 border-blue-900/60"
+                        ? "bg-[#0A174E] text-white border-[#4F93C9] ring-4 ring-[#4F93C9]/30 animate-pulse"
+                        : "bg-[#081342] text-white/30 border-white/15"
                     }`}
                   >
                     {digit ? digit : isCurrent ? "_" : "•"}
@@ -528,8 +669,8 @@ export default function StandaloneTVPlayerPage() {
             </div>
 
             {connecting && (
-              <div className="flex items-center justify-center gap-2 text-xs text-blue-300 font-bold mb-4 animate-pulse">
-                <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center justify-center gap-2 text-xs text-[#4F93C9] font-bold mb-4 animate-pulse">
+                <div className="w-4 h-4 border-2 border-[#4F93C9] border-t-transparent rounded-full animate-spin" />
                 Validando conexão com a rede Media+...
               </div>
             )}
@@ -542,7 +683,7 @@ export default function StandaloneTVPlayerPage() {
                   type="button"
                   tabIndex={0}
                   onClick={() => handleVirtualKey(num.toString())}
-                  className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 focus:bg-blue-600 focus:ring-4 focus:ring-sky-400 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
+                  className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-[#4F93C9] focus:bg-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/50 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
                 >
                   {num}
                 </button>
@@ -559,7 +700,7 @@ export default function StandaloneTVPlayerPage() {
                 type="button"
                 tabIndex={0}
                 onClick={() => handleVirtualKey("0")}
-                className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-blue-600 focus:bg-blue-600 focus:ring-4 focus:ring-sky-400 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
+                className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-[#4F93C9] focus:bg-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/50 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
               >
                 0
               </button>
@@ -567,9 +708,12 @@ export default function StandaloneTVPlayerPage() {
                 type="button"
                 tabIndex={0}
                 onClick={() => handleVirtualKey("backspace")}
-                className="h-14 sm:h-16 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 focus:bg-amber-600 focus:ring-4 focus:ring-amber-400 focus:scale-105 text-amber-200 focus:text-white border border-amber-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center"
+                className="h-14 sm:h-16 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 focus:bg-amber-600 focus:ring-4 focus:ring-amber-400 focus:scale-105 text-amber-200 focus:text-white border border-amber-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center gap-1"
               >
-                ⌫ APAGAR
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414a2 2 0 011.414-.586H19a2 2 0 012 2v10a2 2 0 01-2 2h-7.172a2 2 0 01-1.414-.586L3 12z" />
+                </svg>
+                <span>APAGAR</span>
               </button>
             </div>
 
@@ -579,14 +723,17 @@ export default function StandaloneTVPlayerPage() {
                 tabIndex={0}
                 onClick={() => connectWithCode(codeDigits.join(""))}
                 disabled={connecting}
-                className="w-full max-w-xs mx-auto mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 focus:ring-4 focus:ring-emerald-300 focus:scale-[1.02] font-black text-sm text-white shadow-xl shadow-emerald-500/30 transition-all cursor-pointer outline-none flex items-center justify-center gap-2"
+                className="w-full max-w-xs mx-auto mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-[#8FAE9E] to-[#4F93C9] hover:brightness-110 focus:ring-4 focus:ring-[#4F93C9]/40 focus:scale-[1.02] font-black text-sm text-white shadow-xl shadow-[#4F93C9]/30 transition-all cursor-pointer outline-none flex items-center justify-center gap-2"
               >
-                <span>✓ CONECTAR TV AGORA</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>CONECTAR TV AGORA</span>
               </button>
             )}
           </div>
 
-          <p className="text-xs text-blue-200/60 mt-6 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-blue-100/60 mt-6 max-w-md mx-auto leading-relaxed">
             Dica para Smart TV: você pode digitar os números (0 a 9) diretamente no teclado do seu controle remoto ou usar as setas e o botão OK.
           </p>
         </div>
@@ -609,17 +756,25 @@ export default function StandaloneTVPlayerPage() {
         >
           {/* Botão sutil para desconectar caso queira */}
           <button
+            type="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               desconectarTV();
             }}
-            className="absolute top-4 left-4 text-[10px] uppercase font-bold tracking-wider text-white/30 hover:text-white/80 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-md transition cursor-pointer"
+            className="absolute top-4 left-4 text-[11px] uppercase font-bold tracking-wider text-white/70 hover:text-white focus:text-white bg-black/60 focus:bg-[#4F93C9] px-3 py-1.5 rounded-xl border border-white/20 focus:ring-2 focus:ring-[#4F93C9] backdrop-blur-md transition cursor-pointer outline-none flex items-center gap-1.5"
           >
-            ⚙️ Código: {pairedCode} (Trocar)
+            <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Código: {pairedCode} (Trocar)</span>
           </button>
 
-          <div className="w-20 h-20 rounded-3xl bg-blue-600/20 border border-blue-400/30 text-blue-300 flex items-center justify-center text-3xl mx-auto mb-4 shadow-2xl backdrop-blur-md">
-            📺
+          <div className="w-20 h-20 rounded-3xl bg-[#4F93C9]/20 border border-[#4F93C9]/30 text-[#4F93C9] flex items-center justify-center mx-auto mb-4 shadow-2xl backdrop-blur-md">
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-heading">
             {ponto.nomeEmpresa}
@@ -628,16 +783,56 @@ export default function StandaloneTVPlayerPage() {
             Canal de exibição conectado e pronto. Novos anúncios aprovados começarão a ser exibidos automaticamente.
           </p>
           <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold text-white">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#8FAE9E] animate-pulse" />
             Transmissão Conectada (Código {pairedCode}) • Duplo clique para tela cheia
           </div>
+
+          {/* Modal de confirmação de desconexão */}
+          {showDisconnectModal && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in"
+            >
+              <div className="bg-[#0E1F66] border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-300 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-400/30">
+                  <svg className="w-8 h-8 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-black text-white font-heading">
+                  Desconectar esta TV?
+                </h3>
+                <p className="text-xs text-blue-100/80 mt-2 leading-relaxed">
+                  A transmissão atual será encerrada e a tela voltará a solicitar um novo código de pareamento.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    onClick={() => setShowDisconnectModal(false)}
+                    className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 focus:bg-white/30 text-white text-xs font-bold transition outline-none cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    onClick={executarDesconexao}
+                    className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 focus:bg-rose-700 text-white text-xs font-bold transition outline-none cursor-pointer shadow-lg shadow-rose-600/30"
+                  >
+                    Desconectar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </TVFrame>
     );
   }
 
   // TELA 3: Player Ativo com Anúncios
-  const currentAd = anuncios[currentIndex];
+  const currentAd = anuncios[currentIndex] || anuncios[0];
 
   return (
     <TVFrame
@@ -650,43 +845,93 @@ export default function StandaloneTVPlayerPage() {
         onDoubleClick={toggleFullScreen}
         className="w-full h-full flex items-center justify-center relative select-none cursor-pointer"
       >
-        {/* Botão discreto para gerenciar conexão */}
+        {/* Botão para gerenciar conexão acessível via controle remoto */}
         <button
+          type="button"
+          tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
             desconectarTV();
           }}
-          className="absolute top-4 left-4 z-30 text-[10px] font-bold text-white/30 hover:text-white bg-black/50 px-2.5 py-1 rounded-lg backdrop-blur-md border border-white/10 opacity-0 hover:opacity-100 transition"
+          className="absolute top-4 left-4 z-30 text-[11px] font-bold text-white/70 hover:text-white focus:text-white bg-black/60 focus:bg-[#4F93C9] px-3 py-1.5 rounded-xl backdrop-blur-md border border-white/20 focus:ring-2 focus:ring-[#4F93C9] transition cursor-pointer outline-none flex items-center gap-1.5"
         >
-          ⚙️ Pareado: {pairedCode}
+          <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>Pareado: {pairedCode}</span>
         </button>
 
-        {currentAd.tipoMidia === "VIDEO" ? (
+        {currentAd?.tipoMidia === "VIDEO" ? (
           <video
             ref={videoRef}
-            key={`${currentAd.id}-${currentIndex}`}
+            key={`${currentAd.id}-${cycleCount}`}
             src={currentAd.midiaUrl}
             autoPlay
             playsInline
-            onPlay={() => {
-              if (videoRef.current) {
-                videoRef.current.muted = false;
-                videoRef.current.volume = 1;
+            muted
+            onEnded={() => {
+              if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
               }
+              nextAd(false);
             }}
-            onEnded={nextAd}
             onError={() => {
-              setTimeout(nextAd, 2000);
+              handleMediaError(currentAd.titulo, currentAd.id);
             }}
             className="w-full h-full object-contain"
           />
-        ) : (
+        ) : currentAd ? (
           <img
-            key={`${currentAd.id}-${currentIndex}`}
+            key={`${currentAd.id}-${cycleCount}`}
             src={currentAd.midiaUrl}
             alt={currentAd.titulo}
+            onError={() => {
+              handleMediaError(currentAd.titulo, currentAd.id);
+            }}
             className="w-full h-full object-contain animate-fade-in"
           />
+        ) : null}
+
+        {/* Modal de confirmação de desconexão */}
+        {showDisconnectModal && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in"
+          >
+            <div className="bg-[#0E1F66] border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-300 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-400/30">
+                <svg className="w-8 h-8 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-black text-white font-heading">
+                Desconectar esta TV?
+              </h3>
+              <p className="text-xs text-blue-200/80 mt-2 leading-relaxed">
+                A transmissão atual será encerrada e a tela voltará a solicitar um novo código de pareamento.
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => setShowDisconnectModal(false)}
+                  className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 focus:bg-white/30 text-white text-xs font-bold transition outline-none cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={executarDesconexao}
+                  className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 focus:bg-rose-700 text-white text-xs font-bold transition outline-none cursor-pointer shadow-lg shadow-rose-600/30"
+                >
+                  Desconectar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </TVFrame>

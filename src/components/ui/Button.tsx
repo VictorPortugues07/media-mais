@@ -4,7 +4,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "gradient" | "secondary" | "danger" | "ghost" | "success" | "outline-brand";
+  variant?: "primary" | "gradient" | "secondary" | "danger" | "ghost" | "success" | "outline-brand" | "navy" | "teal";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
 }
@@ -23,17 +23,21 @@ export function Button({
 
   const variants = {
     primary:
-      "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 hover:shadow-blue-500/30 focus:ring-blue-500",
+      "bg-[#4F93C9] hover:bg-[#3D82B5] text-white shadow-sm shadow-[#4F93C9]/25 focus:ring-[#4F93C9]",
+    navy:
+      "bg-[#0E1F66] hover:bg-[#0A174E] text-white shadow-sm shadow-[#0E1F66]/20 focus:ring-[#0E1F66]",
     gradient:
-      "bg-brand-gradient hover:bg-brand-gradient-hover text-white shadow-md shadow-blue-500/25 focus:ring-blue-500",
+      "bg-brand-gradient hover:bg-brand-gradient-hover text-white shadow-md shadow-[#0E1F66]/20 focus:ring-[#4F93C9]",
     secondary:
-      "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 focus:ring-blue-500",
+      "border border-[#E4E7EC] bg-white hover:bg-[#F7F8FA] text-[#344054] hover:text-[#0E1F66] focus:ring-[#4F93C9]",
     "outline-brand":
-      "border border-blue-200 bg-blue-50/50 hover:bg-blue-50 text-blue-700 hover:border-blue-300 focus:ring-blue-500",
+      "border border-[#4F93C9]/40 bg-[#4F93C9]/10 hover:bg-[#4F93C9]/20 text-[#0E1F66] focus:ring-[#4F93C9]",
+    teal:
+      "bg-[#8FAE9E] hover:bg-[#7A9C8D] text-white shadow-sm focus:ring-[#8FAE9E]",
     danger:
-      "bg-red-600 hover:bg-red-700 text-white shadow-red-500/20 focus:ring-red-500",
+      "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20 focus:ring-rose-500",
     ghost:
-      "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 focus:ring-slate-400 shadow-none",
+      "text-[#344054] hover:bg-slate-100/80 hover:text-[#0E1F66] focus:ring-slate-400 shadow-none",
     success:
       "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 focus:ring-emerald-500",
   };

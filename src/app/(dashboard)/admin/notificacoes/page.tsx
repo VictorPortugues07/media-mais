@@ -54,11 +54,11 @@ function getTipoBadge(tipo: string) {
 function getRoleBadge(role?: string) {
   switch (role) {
     case "ADMIN":
-      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-100">Admin</span>;
+      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#F2795C]/15 text-[#9C3218] border border-[#F2795C]/30">Admin</span>;
     case "ANUNCIANTE":
-      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">Anunciante</span>;
+      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#4F93C9]/15 text-[#0E1F66] border border-[#4F93C9]/30">Anunciante</span>;
     case "PONTO":
-      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">TV / Ponto</span>;
+      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#8FAE9E]/20 text-[#1E4333] border border-[#8FAE9E]/40">TV / Ponto</span>;
     default:
       return null;
   }
@@ -188,16 +188,24 @@ export default function AdminNotificacoesPage() {
               label: "Total Listadas",
               value: notificacoes.length,
               sub: scope === "todas" ? "todas as contas da rede" : "alertas da sua conta",
-              icon: "🔔",
-              color: "text-blue-600",
-              bg: "bg-blue-50",
-              ring: "ring-blue-100",
+              icon: (
+                <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              ),
+              color: "text-[#0E1F66]",
+              bg: "bg-[#4F93C9]/10",
+              ring: "ring-[#4F93C9]/20",
             },
             {
               label: "Alertas & Remoções",
               value: alertasCount,
               sub: "pedidos de desvinculação",
-              icon: "⚠️",
+              icon: (
+                <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              ),
               color: "text-rose-600",
               bg: "bg-rose-50",
               ring: "ring-rose-100",
@@ -206,7 +214,11 @@ export default function AdminNotificacoesPage() {
               label: "Não Lidas",
               value: naoLidasCount,
               sub: "mensagens pendentes de leitura",
-              icon: "📬",
+              icon: (
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ),
               color: "text-amber-600",
               bg: "bg-amber-50",
               ring: "ring-amber-100",
@@ -215,10 +227,14 @@ export default function AdminNotificacoesPage() {
               label: "Moderação Pendente",
               value: pendentesCount,
               sub: "novos anúncios para aprovar",
-              icon: "⏳",
-              color: "text-indigo-600",
-              bg: "bg-indigo-50",
-              ring: "ring-indigo-100",
+              icon: (
+                <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+              color: "text-[#0E1F66]",
+              bg: "bg-slate-100",
+              ring: "ring-slate-200",
             },
           ].map((kpi) => (
             <Card key={kpi.label}>
@@ -229,7 +245,7 @@ export default function AdminNotificacoesPage() {
                     <p className={`text-3xl font-black font-heading mt-1.5 ${kpi.color}`}>{kpi.value}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{kpi.sub}</p>
                   </div>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0 ${kpi.bg} ring-1 ${kpi.ring}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpi.bg} ring-1 ${kpi.ring}`}>
                     {kpi.icon}
                   </div>
                 </div>
@@ -256,50 +272,50 @@ export default function AdminNotificacoesPage() {
                 </div>
 
                 {/* Alternador de Escopo */}
-                <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-bold shrink-0">
+                <div className="inline-flex p-1 bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl text-xs font-bold shrink-0">
                   <button
                     type="button"
                     onClick={() => setScope("todas")}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                       scope === "todas"
-                        ? "bg-white text-blue-700 shadow-xs"
-                        : "text-slate-500 hover:text-slate-900"
+                        ? "bg-white text-[#0E1F66] shadow-xs"
+                        : "text-[#9AA3AF] hover:text-[#0E1F66]"
                     }`}
                   >
-                    🌐 Todas da Rede
+                    Todas da Rede
                   </button>
                   <button
                     type="button"
                     onClick={() => setScope("minhas")}
                     className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
                       scope === "minhas"
-                        ? "bg-white text-blue-700 shadow-xs"
-                        : "text-slate-500 hover:text-slate-900"
+                        ? "bg-white text-[#0E1F66] shadow-xs"
+                        : "text-[#9AA3AF] hover:text-[#0E1F66]"
                     }`}
                   >
-                    👤 Minhas (Admin)
+                    Minhas (Admin)
                   </button>
                 </div>
               </div>
 
               {/* Barra de Filtros */}
-              <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-[#E4E7EC]">
                 <select
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 transition cursor-pointer"
+                  className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#344054] outline-none focus:border-[#4F93C9] transition cursor-pointer"
                   value={filterTipo}
                   onChange={(e) => setFilterTipo(e.target.value)}
                 >
                   <option value="todos">Todos os tipos</option>
-                  <option value="ALERTA">⚠️ Alertas / Solicitações de Remoção</option>
-                  <option value="ANUNCIO_PENDENTE">⏳ Moderação Pendente</option>
-                  <option value="ANUNCIO_APROVADO">✅ Anúncio Aprovado</option>
-                  <option value="ANUNCIO_REJEITADO">❌ Anúncio Rejeitado</option>
-                  <option value="SISTEMA">ℹ️ Sistema</option>
-                  <option value="GERAL">📢 Geral</option>
+                  <option value="ALERTA">Alertas / Solicitações de Remoção</option>
+                  <option value="ANUNCIO_PENDENTE">Moderação Pendente</option>
+                  <option value="ANUNCIO_APROVADO">Anúncio Aprovado</option>
+                  <option value="ANUNCIO_REJEITADO">Anúncio Rejeitado</option>
+                  <option value="SISTEMA">Sistema</option>
+                  <option value="GERAL">Geral</option>
                 </select>
 
                 <select
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400 transition cursor-pointer"
+                  className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#344054] outline-none focus:border-[#4F93C9] transition cursor-pointer"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
@@ -311,7 +327,7 @@ export default function AdminNotificacoesPage() {
                 <input
                   type="text"
                   placeholder="Buscar por texto, título ou usuário..."
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:border-blue-400 outline-none flex-1 min-w-[200px] transition"
+                  className="bg-[#F7F8FA] border border-[#E4E7EC] rounded-xl px-3 py-1.5 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] outline-none flex-1 min-w-[200px] transition"
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
                 />
@@ -328,7 +344,7 @@ export default function AdminNotificacoesPage() {
                 />
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[#E4E7EC]">
                 {notificacoesFiltradas.map((notif) => {
                   const isRemovalRequest = notif.tipo === "ALERTA" || notif.titulo.toLowerCase().includes("remoção");
 
@@ -336,7 +352,7 @@ export default function AdminNotificacoesPage() {
                     <div
                       key={notif.id}
                       className={`p-5 flex flex-col sm:flex-row items-start gap-4 transition ${
-                        !notif.lida ? "bg-blue-50/30" : "hover:bg-slate-50/60"
+                        !notif.lida ? "bg-[#4F93C9]/10" : "hover:bg-[#F7F8FA]"
                       } ${isRemovalRequest ? "border-l-4 border-l-rose-500" : ""}`}
                     >
                       {/* Indicador de Status */}
@@ -346,8 +362,8 @@ export default function AdminNotificacoesPage() {
                             !notif.lida
                               ? isRemovalRequest
                                 ? "bg-rose-500 ring-4 ring-rose-100 animate-pulse"
-                                : "bg-blue-600 ring-4 ring-blue-100"
-                              : "bg-slate-200"
+                                : "bg-[#4F93C9] ring-4 ring-[#4F93C9]/25"
+                              : "bg-[#CBD5E1]"
                           }`}
                         />
                       </div>
@@ -355,21 +371,21 @@ export default function AdminNotificacoesPage() {
                       {/* Conteúdo */}
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-slate-900 text-sm">{notif.titulo}</h4>
+                          <h4 className="font-bold text-[#0E1F66] text-sm">{notif.titulo}</h4>
                           {getTipoBadge(notif.tipo)}
                           {notif.user && (
-                            <span className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                            <span className="flex items-center gap-1.5 text-[11px] text-[#344054] bg-[#F7F8FA] px-2 py-0.5 rounded-lg border border-[#E4E7EC]">
                               <span>Para: <strong>{notif.user.nome}</strong></span>
                               {getRoleBadge(notif.user.role)}
                             </span>
                           )}
                         </div>
 
-                        <p className="text-xs text-slate-600 leading-relaxed break-words">
+                        <p className="text-xs text-[#344054] leading-relaxed break-words">
                           {notif.mensagem}
                         </p>
 
-                        <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-400">
+                        <div className="flex items-center gap-3 pt-1 text-[11px] text-[#9AA3AF]">
                           <span>
                             {new Date(notif.criadoEm).toLocaleDateString("pt-BR", {
                               day: "2-digit",

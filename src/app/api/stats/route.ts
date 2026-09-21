@@ -1,50 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notificarTvOffline } from "@/lib/notificacoes";
+import { isPontoEmHorarioFuncionamento, getInicioDoDiaBrasilia } from "@/lib/horario";
+import { calcularPrecificacaoPonto } from "@/lib/precificacao";
+import { NextRequest } from "next/server";
 
-function isPontoEmHorarioFuncionamento(
-  diasFuncionamento: string[] | null,
-  horarioAbertura: string | null,
-  horarioFechamento: string | null
-): boolean {
-  try {
-    const agora = new Date();
-    // Dias em português indexados por getDay() [0: Domingo, 1: Segunda...]
-    const diasMap = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-    const diaHoje = diasMap[agora.getDay()];
-
-    const dias = diasFuncionamento && diasFuncionamento.length > 0
-      ? diasFuncionamento
-      : ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
-
-    if (!dias.includes(diaHoje)) {
-      return false;
-    }
-
-    const abertura = horarioAbertura || "08:00";
-    const fechamento = horarioFechamento || "19:00";
-
-    const [horaAbre, minAbre] = abertura.split(":").map(Number);
-    const [horaFecha, minFecha] = fechamento.split(":").map(Number);
-
-    const minAtual = agora.getHours() * 60 + agora.getMinutes();
-    const minInicio = (horaAbre || 8) * 60 + (minAbre || 0);
-    const minFim = (horaFecha || 19) * 60 + (minFecha || 0);
-
-    return minAtual >= minInicio && minAtual <= minFim;
-  } catch {
-    return true;
-  }
-}
-
-export async function GET() {
-  const session = await getSession();
+export async function GET(request?: NextRequest) {
+  const session = await getSession(request);
   if (!session) {
     return Response.json({ error: "Nao autorizado" }, { status: 401 });
   }
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const hoje = getInicioDoDiaBrasilia();
 
   const [
     totalPontos,
@@ -103,6 +70,8 @@ export async function GET() {
     totalExibicoes: number;
   }> = [];
 
+  let roleStats: Record<string, unknown> = {};
+
   if (session.role === "ADMIN") {
     const [anunciosComMetricas, pontosComAtividade] = await Promise.all([
       prisma.anuncio.findMany({
@@ -128,6 +97,16 @@ export async function GET() {
           diasFuncionamento: true,
           horarioAbertura: true,
           horarioFechamento: true,
+          fluxoDiarioEstimado: true,
+          tempoPermanencia: true,
+          notaFluxo: true,
+          notaTempo: true,
+          notaPerfil: true,
+          notaExclusividade: true,
+          scorePonderado: true,
+          tier: true,
+          cotaMensal: true,
+          maxCotas: true,
           _count: {
             select: {
               anuncios: { where: { status: "ATIVO" } },
@@ -143,6 +122,15 @@ export async function GET() {
     const limiteOnlineAtras = new Date(Date.now() - 12 * 1000);
     // Limite de 10 minutos para disparar alerta
     const dezMinutosAtras = new Date(Date.now() - 10 * 60 * 1000);
+
+    let faturamentoMensalTotal = 0;
+    let repasseMensalTotal = 0;
+    let receitaMidiaMaisMensal = 0;
+    const distribuicaoTiers = {
+      Bronze: { pontos: 0, cotasOcupadas: 0, faturamento: 0, repasse: 0, receitaMidiaMais: 0 },
+      Prata: { pontos: 0, cotasOcupadas: 0, faturamento: 0, repasse: 0, receitaMidiaMais: 0 },
+      Ouro: { pontos: 0, cotasOcupadas: 0, faturamento: 0, repasse: 0, receitaMidiaMais: 0 },
+    };
 
     auditoriaAnuncios = anunciosComMetricas.map((a) => ({
       id: a.id,
@@ -167,6 +155,37 @@ export async function GET() {
         notificarTvOffline(p.userId, p.nomeEmpresa).catch((err) => console.error(err));
       }
 
+      const prec = calcularPrecificacaoPonto({
+        fluxoDiarioEstimado: p.fluxoDiarioEstimado,
+        tempoPermanencia: p.tempoPermanencia,
+        notaFluxo: p.notaFluxo,
+        notaTempo: p.notaTempo,
+        notaPerfil: p.notaPerfil,
+        notaExclusividade: p.notaExclusividade,
+      });
+
+      const tier = (p.tier || prec.tier) as "Bronze" | "Prata" | "Ouro";
+      const cota = p.cotaMensal ?? prec.cotaMensal;
+      const cotasAtivas = p._count.anuncios;
+
+      if (p.status === "ATIVO") {
+        const fatPonto = cotasAtivas * cota;
+        const repPonto = cotasAtivas * (cota * 0.5);
+        const recMMPonto = cotasAtivas * (cota * 0.5);
+
+        faturamentoMensalTotal += fatPonto;
+        repasseMensalTotal += repPonto;
+        receitaMidiaMaisMensal += recMMPonto;
+
+        if (distribuicaoTiers[tier]) {
+          distribuicaoTiers[tier].pontos += 1;
+          distribuicaoTiers[tier].cotasOcupadas += cotasAtivas;
+          distribuicaoTiers[tier].faturamento += fatPonto;
+          distribuicaoTiers[tier].repasse += repPonto;
+          distribuicaoTiers[tier].receitaMidiaMais += recMMPonto;
+        }
+      }
+
       return {
         id: p.id,
         nomeEmpresa: p.nomeEmpresa,
@@ -180,13 +199,24 @@ export async function GET() {
         resolucaoTela: p.resolucaoTela,
         anunciosAtivos: p._count.anuncios,
         totalExibicoes: p._count.registroExibicoes,
+        tier,
+        cotaMensal: cota,
+        scorePonderado: p.scorePonderado ?? prec.scorePonderado,
+        maxCotas: p.maxCotas || 8,
       };
     });
+
+    roleStats = {
+      financeiro: {
+        faturamentoMensalTotal,
+        repasseMensalTotal,
+        receitaMidiaMaisMensal,
+        distribuicaoTiers,
+      },
+    };
   }
 
   // Estatísticas específicas de Dono de Ponto
-  let roleStats = {};
-
   if (session.role === "PONTO") {
     const ponto = await prisma.pontoMidia.findUnique({
       where: { userId: session.userId },
@@ -224,6 +254,18 @@ export async function GET() {
         notificarTvOffline(ponto.userId, ponto.nomeEmpresa).catch((err) => console.error(err));
       }
 
+      const prec = calcularPrecificacaoPonto({
+        fluxoDiarioEstimado: ponto.fluxoDiarioEstimado,
+        tempoPermanencia: ponto.tempoPermanencia,
+        notaFluxo: ponto.notaFluxo,
+        notaTempo: ponto.notaTempo,
+        notaPerfil: ponto.notaPerfil,
+        notaExclusividade: ponto.notaExclusividade,
+      });
+
+      const repasseUnitario = ponto.cotaMensal ? ponto.cotaMensal * 0.5 : prec.repasseAoPonto;
+      const repasseMensalEstimado = meusAnuncios * repasseUnitario;
+
       roleStats = {
         meusAnunciosAtivos: meusAnuncios,
         pontoId: ponto.id,
@@ -234,6 +276,12 @@ export async function GET() {
         totalExibicoesPonto: ponto._count.registroExibicoes,
         exibicoesPontoHoje,
         horasOnlineEstimadas: ((duracaoTotal._sum.duracaoSegundos || 0) / 3600).toFixed(1),
+        maxCotas: ponto.maxCotas || 8,
+        financeiro: {
+          repasseMensalEstimado,
+          repassePorAnunciante: repasseUnitario,
+          anunciantesAtivos: meusAnuncios,
+        },
       };
     }
   }
@@ -244,7 +292,7 @@ export async function GET() {
     });
 
     if (anunciante) {
-      const [meusPendentes, meusAtivos, meusRejeitados, totalReproducoes] = await Promise.all([
+      const [meusPendentes, meusAtivos, meusRejeitados, totalReproducoes, meusAnunciosAtivosComPonto] = await Promise.all([
         prisma.anuncio.count({
           where: { anuncianteId: anunciante.id, status: "PENDENTE" },
         }),
@@ -257,13 +305,62 @@ export async function GET() {
         prisma.registroExibicao.count({
           where: { anuncio: { anuncianteId: anunciante.id } },
         }),
+        prisma.anuncio.findMany({
+          where: { anuncianteId: anunciante.id, status: "ATIVO" },
+          include: {
+            pontoMidia: {
+              select: {
+                id: true,
+                nomeEmpresa: true,
+                cidade: true,
+                uf: true,
+                tier: true,
+                cotaMensal: true,
+                fluxoDiarioEstimado: true,
+                tempoPermanencia: true,
+                notaFluxo: true,
+                notaTempo: true,
+                notaPerfil: true,
+                notaExclusividade: true,
+              },
+            },
+          },
+        }),
       ]);
+
+      let gastoMensalTotal = 0;
+      const detalhamentoCampanhas = meusAnunciosAtivosComPonto.map((a) => {
+        const prec = calcularPrecificacaoPonto({
+          fluxoDiarioEstimado: a.pontoMidia.fluxoDiarioEstimado,
+          tempoPermanencia: a.pontoMidia.tempoPermanencia,
+          notaFluxo: a.pontoMidia.notaFluxo,
+          notaTempo: a.pontoMidia.notaTempo,
+          notaPerfil: a.pontoMidia.notaPerfil,
+          notaExclusividade: a.pontoMidia.notaExclusividade,
+        });
+        const cota = a.pontoMidia.cotaMensal ?? prec.cotaMensal;
+        gastoMensalTotal += cota;
+
+        return {
+          anuncioId: a.id,
+          titulo: a.titulo,
+          pontoId: a.pontoMidia.id,
+          pontoNome: a.pontoMidia.nomeEmpresa,
+          cidade: `${a.pontoMidia.cidade}/${a.pontoMidia.uf}`,
+          tier: a.pontoMidia.tier || prec.tier,
+          cotaMensal: cota,
+        };
+      });
 
       roleStats = {
         meusPendentes,
         meusAtivos,
         meusRejeitados,
         totalReproducoes,
+        financeiro: {
+          gastoMensalTotal,
+          detalhamentoCampanhas,
+        },
       };
     }
   }

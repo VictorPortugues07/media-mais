@@ -188,26 +188,26 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
   const roleConfig = {
     ANUNCIANTE: {
       label: "Anunciante",
-      badgeClass: "bg-blue-500/20 text-blue-300 border-blue-400/30",
+      badgeClass: "bg-[#4F93C9]/20 text-[#8ec3ea] border-[#4F93C9]/40",
     },
     PONTO: {
       label: "Dono de TV",
-      badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+      badgeClass: "bg-[#8FAE9E]/20 text-[#c8e2d6] border-[#8FAE9E]/40",
     },
     ADMIN: {
       label: "Administrador",
-      badgeClass: "bg-rose-500/20 text-rose-300 border-rose-400/30",
+      badgeClass: "bg-[#F2795C]/20 text-[#f7a895] border-[#F2795C]/40",
     },
   }[role];
 
   return (
     <>
       {/* Mobile Topbar com fundo branco e logo destacado */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white z-30 px-4 flex items-center justify-between border-b border-slate-200/90 shadow-xs">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white z-30 px-4 flex items-center justify-between border-b border-[#E4E7EC] shadow-xs">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-slate-700 hover:text-blue-600 cursor-pointer"
+            className="p-2 text-[#344054] hover:text-[#4F93C9] cursor-pointer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -226,22 +226,22 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container - Brand Navy #0E1F66 */}
       <aside
         className={cn(
-          "fixed top-0 bottom-0 left-0 w-64 bg-[#051160] text-slate-300 z-50 flex flex-col transition-transform duration-300 ease-in-out border-r border-blue-900/40",
+          "fixed top-0 bottom-0 left-0 w-64 bg-gradient-to-b from-[#0E1F66] to-[#081342] text-white/80 z-50 flex flex-col transition-transform duration-300 ease-in-out border-r border-white/10 shadow-xl",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Brand Header & Role Badge */}
-        <div className="p-5 border-b border-blue-900/40">
+        <div className="p-5 border-b border-white/10">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center">
               <Logo className="h-7 w-auto" whiteText={true} />
             </Link>
             <button
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden text-slate-400 hover:text-white"
+              className="lg:hidden text-white/60 hover:text-white"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -263,7 +263,7 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
         </div>
 
         {/* Nav Links */}
-        <nav className="flex-1 px-3.5 py-4 space-y-1.5 overflow-y-auto">
+        <nav className="flex-1 px-3.5 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
             return (
@@ -273,12 +273,15 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
                 target={(item as { target?: string }).target}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200",
+                  "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 relative",
                   isActive
-                    ? "bg-brand-gradient text-white shadow-md shadow-blue-500/25"
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    ? "bg-[#4F93C9] text-white shadow-sm shadow-[#4F93C9]/30"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}
               >
+                {isActive && (
+                  <span className="absolute right-2 w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" />
+                )}
                 {item.icon}
                 <span>{item.label}</span>
               </Link>
@@ -287,10 +290,28 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
         </nav>
 
         {/* User Footer Minimalista */}
-        <div className="p-4 border-t border-blue-900/40 bg-black/20">
+        <div className="p-4 border-t border-white/10 bg-black/20 space-y-3">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-white/5 border border-white/10">
+            {userAvatar ? (
+              <img
+                src={userAvatar}
+                alt={userName}
+                className="w-7 h-7 rounded-full object-cover border border-white/20 shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate">{userName}</p>
+              <p className="text-[10px] text-white/50 truncate">{userEmail}</p>
+            </div>
+          </div>
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-300 hover:bg-rose-500/15 transition border border-rose-400/20 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#f7a895] hover:bg-[#F2795C]/15 transition border border-[#F2795C]/20 cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

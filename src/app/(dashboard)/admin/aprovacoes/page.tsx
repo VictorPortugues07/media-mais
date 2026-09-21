@@ -47,6 +47,7 @@ export default function AdminAprovacoesPage() {
   const [selectedAdId, setSelectedAdId] = useState<number | null>(null);
   const [diasValidade, setDiasValidade] = useState<number>(30);
   const [approveError, setApproveError] = useState<string | null>(null);
+  const [rejectError, setRejectError] = useState<string | null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -147,6 +148,7 @@ export default function AdminAprovacoesPage() {
   const handleOpenReject = (id: number) => {
     setSelectedAdId(id);
     setMotivoRejeicao("");
+    setRejectError(null);
     setRejectModalOpen(true);
   };
 
@@ -185,20 +187,25 @@ export default function AdminAprovacoesPage() {
     if (!selectedAdId || !motivoRejeicao.trim()) return;
 
     setActionLoading(selectedAdId);
+    setRejectError(null);
     try {
       const res = await fetch(`/api/anuncios/${selectedAdId}/rejeitar`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ motivo: motivoRejeicao }),
       });
-      if (res.ok) {
-        setAnuncios((prev) => prev.filter((a) => a.id !== selectedAdId));
-        setRejectModalOpen(false);
-        setToastMessage("Campanha recusada e anunciante notificado!");
-        setTimeout(() => setToastMessage(null), 4000);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao rejeitar campanha");
       }
-    } catch (err) {
-      console.error("Rejeitar error:", err);
+
+      setAnuncios((prev) => prev.filter((a) => a.id !== selectedAdId));
+      setRejectModalOpen(false);
+      setToastMessage("Campanha recusada e anunciante notificado!");
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao rejeitar campanha";
+      setRejectError(msg);
     } finally {
       setActionLoading(null);
     }
@@ -206,7 +213,7 @@ export default function AdminAprovacoesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ink">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Spinner size="lg" />
       </div>
     );
@@ -226,19 +233,22 @@ export default function AdminAprovacoesPage() {
     >
       <div className="space-y-6">
         {/* Abas de Navegação */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-2 border-b border-[#E4E7EC] pb-2">
           <button
             type="button"
             onClick={() => setActiveTab("PENDENTES")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
               activeTab === "PENDENTES"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#4F93C9] text-white shadow-md shadow-[#4F93C9]/20"
+                : "bg-[#F7F8FA] text-[#344054] hover:bg-slate-100 border border-[#E4E7EC]"
             }`}
           >
-            <span>📋 Moderação Pendente</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span>Moderação Pendente</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "PENDENTES" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+              activeTab === "PENDENTES" ? "bg-white/20 text-white" : "bg-slate-200 text-[#0E1F66] font-bold"
             }`}>
               {pendentesList.length}
             </span>
@@ -249,13 +259,16 @@ export default function AdminAprovacoesPage() {
             onClick={() => setActiveTab("FILA_ESPERA")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
               activeTab === "FILA_ESPERA"
-                ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D] shadow-md"
+                : "bg-[#F7F8FA] text-[#344054] hover:bg-slate-100 border border-[#E4E7EC]"
             }`}
           >
-            <span>⏳ Fila de Espera dos Pontos</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Fila de Espera dos Pontos</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === "FILA_ESPERA" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+              activeTab === "FILA_ESPERA" ? "bg-[#B45309]/15 text-[#92400E] font-bold" : "bg-slate-200 text-[#0E1F66] font-bold"
             }`}>
               {filaList.length}
             </span>
@@ -266,12 +279,12 @@ export default function AdminAprovacoesPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 font-heading">
+                <h3 className="font-bold text-[#0E1F66] font-heading">
                   {activeTab === "PENDENTES"
                     ? `Campanhas Aguardando Avaliação (${pendentesList.length})`
                     : `Empresas na Fila de Espera (${filaList.length})`}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[#9AA3AF]">
                   {activeTab === "PENDENTES"
                     ? "Valide o conteúdo antes de liberar na grade de 6 minutos da TV."
                     : "Empresas aguardando abertura de novas vagas nos estabelecimentos selecionados."}
@@ -285,7 +298,7 @@ export default function AdminAprovacoesPage() {
                 <EmptyState
                   title={
                     activeTab === "PENDENTES"
-                      ? "Fila de aprovação zerada! 🎉"
+                      ? "Fila de aprovação zerada"
                       : "Nenhuma empresa na fila de espera no momento."
                   }
                   description={
@@ -296,14 +309,14 @@ export default function AdminAprovacoesPage() {
                 />
               </div>
             ) : (
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-[#E4E7EC]">
                 {currentList.map((anuncio, idx) => (
                   <div
                     key={anuncio.id}
-                    className="p-6 flex flex-col lg:flex-row gap-6 hover:bg-slate-50/50 transition"
+                    className="p-6 flex flex-col lg:flex-row gap-6 hover:bg-[#F7F8FA] transition"
                   >
                     <div className="w-full lg:w-80 shrink-0">
-                      <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-sm flex items-center justify-center relative">
+                      <div className="aspect-video bg-[#0E1F66] rounded-2xl overflow-hidden shadow-xs flex items-center justify-center relative">
                         {anuncio.tipoMidia === "VIDEO" ? (
                           <video
                             src={anuncio.midiaUrl}
@@ -321,7 +334,7 @@ export default function AdminAprovacoesPage() {
                           {anuncio.tipoMidia} • {anuncio.duracaoSegundos}s
                         </span>
                         {anuncio.status === "FILA_ESPERA" && (
-                          <span className="absolute bottom-2 left-2 bg-amber-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-xs">
+                          <span className="absolute bottom-2 left-2 bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D] text-[10px] font-black px-2 py-0.5 rounded-lg">
                             Fila #{anuncio.posicaoFila || idx + 1}
                           </span>
                         )}
@@ -331,36 +344,36 @@ export default function AdminAprovacoesPage() {
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="text-base font-bold text-slate-900 font-heading">
+                          <h4 className="text-base font-bold text-[#0E1F66] font-heading">
                             {anuncio.titulo}
                           </h4>
-                          <Badge variant={anuncio.status === "FILA_ESPERA" ? "warning" : "default"}>
+                          <Badge variant={anuncio.status === "FILA_ESPERA" ? "fila" : "default"}>
                             {anuncio.status === "FILA_ESPERA" ? "Fila de Espera" : "Aguardando Moderação"}
                           </Badge>
                         </div>
 
-                        <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                        <p className="text-xs text-[#344054] mt-2 leading-relaxed">
                           {anuncio.descricao}
                         </p>
 
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-[#F7F8FA] rounded-xl border border-[#E4E7EC] text-xs">
                           <div>
-                            <span className="font-bold text-slate-400 uppercase text-[10px]">
+                            <span className="font-bold text-[#9AA3AF] uppercase text-[10px]">
                               Anunciante
                             </span>
-                            <p className="font-bold text-slate-900 mt-0.5">
+                            <p className="font-bold text-[#0E1F66] mt-0.5">
                               {anuncio.anunciante.nomeEmpresa}
                             </p>
-                            <p className="text-slate-500">{anuncio.anunciante.categoria}</p>
+                            <p className="text-[#344054]">{anuncio.anunciante.categoria}</p>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-400 uppercase text-[10px]">
+                            <span className="font-bold text-[#9AA3AF] uppercase text-[10px]">
                               TV de Destino
                             </span>
-                            <p className="font-bold text-slate-900 mt-0.5">
+                            <p className="font-bold text-[#0E1F66] mt-0.5">
                               {anuncio.pontoMidia.nomeEmpresa}
                             </p>
-                            <p className="text-slate-500">
+                            <p className="text-[#344054]">
                               {anuncio.pontoMidia.cidade} - {anuncio.pontoMidia.uf}
                             </p>
                           </div>
@@ -386,8 +399,12 @@ export default function AdminAprovacoesPage() {
                             size="md"
                             disabled={actionLoading === anuncio.id}
                             onClick={() => handleMoverParaFila(anuncio.id)}
+                            className="flex items-center gap-1.5"
                           >
-                            ⏳ Mover para Fila
+                            <svg className="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Mover para Fila</span>
                           </Button>
                         )}
 
@@ -499,6 +516,12 @@ export default function AdminAprovacoesPage() {
         description="Explique o motivo para que o anunciante possa corrigir e reenviar a peça."
       >
         <div className="space-y-4">
+          {rejectError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
+              {rejectError}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
               Motivo da Recusa

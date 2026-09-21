@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { processarExpiracaoAnuncios, filtroAnunciosAtivosNaoExpirados } from "@/lib/expiracao";
 
 // Headers CORS para permitir que qualquer projeto externo (SPA, Electron, Smart TV app) acesse
 function corsHeaders() {
@@ -107,11 +108,14 @@ export async function GET(request: NextRequest) {
     data: { ultimaAtividade: new Date() },
   });
 
-  // 3. Buscar anúncios ativos aprovados para esta TV
+  // 3. Processar expiração de anúncios vencidos para liberar espaço na TV
+  await processarExpiracaoAnuncios(ponto.id);
+
+  // 4. Buscar anúncios ativos aprovados para esta TV que não expiraram
   const anuncios = await prisma.anuncio.findMany({
     where: {
       pontoMidiaId: ponto.id,
-      status: "ATIVO",
+      ...filtroAnunciosAtivosNaoExpirados(),
     },
     select: {
       id: true,

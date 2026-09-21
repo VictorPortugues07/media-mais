@@ -17,20 +17,25 @@ export async function notificarAprovacao(
   pontoUserId: number,
   tituloAnuncio: string,
   nomeAnunciante: string,
-  nomePonto: string
+  nomePonto: string,
+  valorRepasse?: number
 ) {
+  const mensagemPonto = valorRepasse && valorRepasse > 0
+    ? `Novo anunciante na sua TV! O anúncio "${tituloAnuncio}" de "${nomeAnunciante}" foi ativado. Você começará a receber + ${valorRepasse.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} mensais na sua conta.`
+    : `O anúncio "${tituloAnuncio}" de "${nomeAnunciante}" foi aprovado e vai começar a passar na sua TV.`;
+
   await Promise.all([
     criarNotificacao(
       anuncianteUserId,
       "ANUNCIO_APROVADO",
-      "Anuncio Aprovado!",
-      `Seu anuncio "${tituloAnuncio}" foi aprovado e ja esta ativo no ponto "${nomePonto}".`
+      "Anúncio Aprovado!",
+      `Seu anúncio "${tituloAnuncio}" foi aprovado e já está ativo no ponto "${nomePonto}".`
     ),
     criarNotificacao(
       pontoUserId,
       "NOVO_ANUNCIO_TV",
-      "Novo Anuncio na sua TV!",
-      `O anuncio "${tituloAnuncio}" de "${nomeAnunciante}" foi aprovado e vai comecar a passar na sua TV.`
+      "Novo Anúncio na sua TV!",
+      mensagemPonto
     ),
   ]);
 }
@@ -52,12 +57,13 @@ export async function notificarTvOffline(
   pontoUserId: number,
   nomeEmpresa: string
 ) {
-  // Evitar floodar notificações se já foi emitida uma nos últimos 30 minutos
+  // Evitar floodar notificações se já foi emitido um alerta específico de TV offline nos últimos 30 minutos
   const trintaMinAtras = new Date(Date.now() - 30 * 60 * 1000);
   const recente = await prisma.notificacao.findFirst({
     where: {
       userId: pontoUserId,
       tipo: "ALERTA",
+      titulo: { contains: "TV Desconectada" },
       criadoEm: { gte: trintaMinAtras },
     },
   });

@@ -171,8 +171,8 @@ export default function AdminUsuariosPage() {
               onClick={() => setFilterRole("ALL")}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 filterRole === "ALL"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  ? "bg-[#4F93C9] text-white shadow-xs"
+                  : "bg-white text-[#344054] hover:bg-[#F7F8FA] border border-[#E4E7EC]"
               }`}
             >
               Todos ({users.length})
@@ -181,8 +181,8 @@ export default function AdminUsuariosPage() {
               onClick={() => setFilterRole("PONTO")}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 filterRole === "PONTO"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  ? "bg-[#0E1F66] text-white shadow-xs"
+                  : "bg-white text-[#344054] hover:bg-[#F7F8FA] border border-[#E4E7EC]"
               }`}
             >
               Donos de TV ({users.filter((u) => u.role === "PONTO").length})
@@ -191,8 +191,8 @@ export default function AdminUsuariosPage() {
               onClick={() => setFilterRole("ANUNCIANTE")}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 filterRole === "ANUNCIANTE"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  ? "bg-[#4F93C9] text-white shadow-xs"
+                  : "bg-white text-[#344054] hover:bg-[#F7F8FA] border border-[#E4E7EC]"
               }`}
             >
               Anunciantes ({users.filter((u) => u.role === "ANUNCIANTE").length})
@@ -202,7 +202,7 @@ export default function AdminUsuariosPage() {
           <input
             type="text"
             placeholder="Buscar por nome, e-mail ou empresa..."
-            className="bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 shadow-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none w-full sm:w-72 transition"
+            className="bg-white border border-[#E4E7EC] rounded-xl px-3.5 py-2 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] shadow-xs focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none w-full sm:w-72 transition"
             value={filterSearch}
             onChange={(e) => setFilterSearch(e.target.value)}
           />
@@ -213,30 +213,30 @@ export default function AdminUsuariosPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 font-heading">
+                <h3 className="font-bold text-[#0E1F66] font-heading">
                   Usuários Encontrados ({filteredUsers.length})
                 </h3>
               </div>
             </div>
           </CardHeader>
           <CardBody className="p-0">
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-[#E4E7EC]">
               {filteredUsers.map((u) => (
                 <div
                   key={u.id}
                   className={`p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition ${
-                    !u.ativo ? "bg-red-50/40" : "hover:bg-slate-50/70"
+                    !u.ativo ? "bg-rose-50/40" : "hover:bg-[#F7F8FA]"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-slate-900 text-sm">{u.nome}</h4>
+                      <h4 className="font-bold text-[#0E1F66] text-sm">{u.nome}</h4>
                       <Badge
                         variant={
                           u.role === "ADMIN"
-                            ? "danger"
+                            ? "coral"
                             : u.role === "PONTO"
-                            ? "success"
+                            ? "teal"
                             : "brand"
                         }
                       >
@@ -245,38 +245,38 @@ export default function AdminUsuariosPage() {
 
                       {/* Status da Conta */}
                       {u.ativo ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1E4333] bg-[#D8E8E1] px-2 py-0.5 rounded-md border border-[#8FAE9E]/50">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" />
                           Conta Ativa
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           Inativo / Bloqueado
                         </span>
                       )}
 
                       {/* Status de Moderação do Ponto se for dono de TV */}
                       {u.pontoMidia?.status === "PENDENTE" && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          ⏳ Ponto em Moderação
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0E1F66] bg-[#4F93C9]/15 px-2 py-0.5 rounded-md border border-[#4F93C9]/30">
+                          Ponto em Moderação
                         </span>
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-600 mt-1">
-                      E-mail: <strong className="text-slate-800">{u.email}</strong> • WhatsApp: {u.whatsapp}
+                    <p className="text-xs text-[#344054] mt-1">
+                      E-mail: <strong className="text-[#0E1F66]">{u.email}</strong> • WhatsApp: {u.whatsapp}
                     </p>
 
-                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                    <p className="text-xs text-[#9AA3AF] mt-0.5 flex items-center gap-2">
                       <span>
                         Vinculado a:{" "}
-                        <strong className="text-slate-700">
+                        <strong className="text-[#344054]">
                           {u.pontoMidia?.nomeEmpresa || u.anunciante?.nomeEmpresa || "Acesso Administrativo"}
                         </strong>
                       </span>
                       {u.pontoMidia?.codigoTv && (
-                        <span className="bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-slate-700 border border-slate-200">
+                        <span className="bg-[#F7F8FA] px-2 py-0.5 rounded font-mono font-bold text-[#0E1F66] border border-[#E4E7EC]">
                           Código TV: {u.pontoMidia.codigoTv}
                         </span>
                       )}
@@ -289,8 +289,12 @@ export default function AdminUsuariosPage() {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleOpenNotifyModal(u)}
+                      className="flex items-center gap-1.5"
                     >
-                      ✉️ Notificar / Cobrar
+                      <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span>Notificar / Cobrar</span>
                     </Button>
 
                     {u.role !== "ADMIN" && (
@@ -328,10 +332,10 @@ export default function AdminUsuariosPage() {
             label="Tipo de Notificação"
             required
             options={[
-              { value: "ALERTA", label: "⚠️ Alerta / Aviso Operacional" },
-              { value: "COBRANCA", label: "💳 Cobrança / Financeiro" },
-              { value: "SISTEMA", label: "⚙️ Mensagem do Sistema" },
-              { value: "GERAL", label: "ℹ️ Informativo Geral" },
+              { value: "ALERTA", label: "Alerta / Aviso Operacional" },
+              { value: "COBRANCA", label: "Cobrança / Financeiro" },
+              { value: "SISTEMA", label: "Mensagem do Sistema" },
+              { value: "GERAL", label: "Informativo Geral" },
             ]}
             value={notifyForm.tipo}
             onChange={(e) =>
@@ -354,7 +358,7 @@ export default function AdminUsuariosPage() {
             <textarea
               rows={4}
               required
-              className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
               placeholder="Escreva a mensagem que o usuário visualizará na central de notificações..."
               value={notifyForm.mensagem}
               onChange={(e) => setNotifyForm({ ...notifyForm, mensagem: e.target.value })}
@@ -371,11 +375,11 @@ export default function AdminUsuariosPage() {
             </Button>
             <Button
               type="submit"
-              variant="gradient"
+              variant="primary"
               loading={sendingNotification}
               disabled={!notifyForm.titulo || !notifyForm.mensagem}
             >
-              Enviar Notificação 🚀
+              Enviar Notificação
             </Button>
           </div>
         </form>

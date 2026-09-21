@@ -53,19 +53,19 @@ export default function LoginPage() {
         <Link href="/" className="inline-flex justify-center transition-opacity hover:opacity-80">
           <Logo className="h-8 w-auto" />
         </Link>
-        <h2 className="mt-5 text-2xl font-bold tracking-tight text-slate-900 font-heading">
+        <h2 className="mt-5 text-2xl font-black tracking-tight text-[#0E1F66] font-heading">
           Acesse a plataforma
         </h2>
-        <p className="mt-1 text-xs sm:text-sm text-slate-600">
+        <p className="mt-1 text-xs sm:text-sm text-[#344054]">
           Entre com seu e-mail e senha cadastrados
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-sm shadow-slate-900/5 sm:rounded-2xl border border-slate-200/80">
+        <div className="bg-white py-8 px-6 shadow-xs sm:rounded-2xl border border-[#E4E7EC]">
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs font-medium text-red-700">
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-medium text-rose-700">
                 {error}
               </div>
             )}
@@ -101,10 +101,10 @@ export default function LoginPage() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100" />
+                <div className="w-full border-t border-[#E4E7EC]" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-slate-400 font-semibold tracking-wider text-[10px]">
+                <span className="bg-white px-2 text-[#9AA3AF] font-semibold tracking-wider text-[10px]">
                   Ainda não possui conta?
                 </span>
               </div>
@@ -113,15 +113,15 @@ export default function LoginPage() {
             <div className="mt-6 grid grid-cols-2 gap-3">
               <Link
                 href="/cadastro/ponto"
-                className="flex items-center justify-center px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-center"
+                className="flex items-center justify-center px-3 py-2 border border-[#E4E7EC] rounded-xl text-xs font-semibold text-[#344054] hover:bg-[#F7F8FA] hover:text-[#0E1F66] transition text-center"
               >
-                Cadastrar TV 📺
+                Cadastrar TV
               </Link>
               <Link
                 href="/cadastro/anunciante"
-                className="flex items-center justify-center px-3 py-2 border border-blue-200 bg-blue-50/60 rounded-xl text-xs font-semibold text-blue-700 hover:bg-blue-50 transition text-center"
+                className="flex items-center justify-center px-3 py-2 border border-[#4F93C9]/40 bg-[#4F93C9]/10 rounded-xl text-xs font-semibold text-[#0E1F66] hover:bg-[#4F93C9]/20 transition text-center"
               >
-                Quero Anunciar 🚀
+                Quero Anunciar
               </Link>
             </div>
           </div>

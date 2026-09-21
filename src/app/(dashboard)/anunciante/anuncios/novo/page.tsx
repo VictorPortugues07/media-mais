@@ -23,6 +23,11 @@ interface PontoOption {
   porcentagemOcupada: number;
   quantidadeFilaEspera: number;
   proximaLiberacao?: string | null;
+  maxCotas?: number;
+  cotasOcupadas?: number;
+  cotasDisponiveis?: number;
+  tier?: string;
+  cotaMensal?: number;
 }
 
 function NovoAnuncioForm() {
@@ -126,9 +131,9 @@ function NovoAnuncioForm() {
 
   const selectedPonto = pontos.find((p) => String(p.id) === selectedPontoId);
   const isPontoBloqueado = selectedPonto ? !selectedPonto.aceitaNovosAnuncios : false;
-  const loopLotado = selectedPonto
-    ? (selectedPonto.tempoOcupadoSegundos + duracaoSegundos) > (selectedPonto.limiteTempoSegundos || 360)
-    : false;
+  const maxCotasPonto = selectedPonto?.maxCotas || 8;
+  const cotasOcupadasPonto = selectedPonto?.cotasOcupadas ?? 0;
+  const cotasLotadas = selectedPonto ? cotasOcupadasPonto >= maxCotasPonto : false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,78 +236,121 @@ function NovoAnuncioForm() {
                   required
                   options={pontos.map((p) => {
                     const isBloq = !p.aceitaNovosAnuncios;
-                    const isLotado = p.tempoOcupadoSegundos >= (p.limiteTempoSegundos || 360);
+                    const maxCotas = p.maxCotas || 8;
+                    const ocupadas = p.cotasOcupadas || 0;
+                    const isLotado = ocupadas >= maxCotas;
+                    const preco = (p.cotaMensal ?? 249).toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    });
                     let tag = "";
-                    if (isBloq) tag = " [Solicitações Pausadas]";
-                    else if (isLotado) tag = ` [Fila de Espera: ${p.quantidadeFilaEspera} aguardando]`;
-                    else tag = ` [${(p.limiteTempoSegundos || 360) - p.tempoOcupadoSegundos}s livres]`;
+                    if (isBloq) tag = " [Pausado]";
+                    else if (isLotado) tag = ` [Fila: ${p.quantidadeFilaEspera} aguardando]`;
+                    else tag = ` [${maxCotas - ocupadas} cotas livres]`;
 
                     return {
                       value: String(p.id),
-                      label: `${p.nomeEmpresa} - ${p.categoria} (${p.cidade}/${p.uf})${tag}`,
+                      label: `${p.nomeEmpresa} (${p.cidade}) · ${p.tier ?? "Tier"} ${preco}/mês${tag}`,
                     };
                   })}
                   value={selectedPontoId}
                   onChange={(e) => setSelectedPontoId(e.target.value)}
                 />
 
-                {/* Card Informativo de Capacidade e Fila do Ponto Selecionado */}
-                {selectedPonto && (
-                  <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="font-bold text-slate-700">
-                        Capacidade da TV (Loop de 6 minutos / 360s):
-                      </span>
+                {/* Card Informativo de Precificação, Cotas e Fila do Ponto Selecionado */}
+                {selectedPonto && (() => {
+                  const maxCotas = selectedPonto.maxCotas || 8;
+                  const cotasOcupadas = selectedPonto.cotasOcupadas || 0;
+                  const cotasDisponiveis = Math.max(0, maxCotas - cotasOcupadas);
+                  const perc = Math.min(100, Math.round((cotasOcupadas / maxCotas) * 100));
+                  const precoFormatado = (selectedPonto.cotaMensal ?? 249).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  });
+
+                  return (
+                    <div className="mt-3 p-4 bg-[#F7F8FA] border border-[#E4E7EC] rounded-2xl text-xs space-y-3">
+                      {/* Banner do Preço da Cota */}
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-[#E4E7EC] shadow-xs">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#9AA3AF]">
+                            Investimento da Cota
+                          </span>
+                          <p className="text-xl font-black font-heading text-emerald-600">
+                            {precoFormatado}
+                            <span className="text-xs font-normal text-[#9AA3AF]"> /mês</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                              selectedPonto.tier === "Ouro"
+                                ? "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
+                                : selectedPonto.tier === "Prata"
+                                ? "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]"
+                                : "bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74]"
+                            }`}
+                          >
+                            {selectedPonto.tier ?? "Tier Ouro"}
+                          </span>
+                          <p className="text-[10px] text-[#9AA3AF] mt-0.5">1 cota no loop da TV</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="font-bold text-[#344054]">
+                          Ocupação de Cotas ({cotasOcupadas}/{maxCotas}):
+                        </span>
+                        {isPontoBloqueado ? (
+                          <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px]">
+                            Novas Solicitações Pausadas
+                          </span>
+                        ) : cotasLotadas ? (
+                          <span className="px-2 py-0.5 rounded-md bg-[#FEF3C7] text-[#92400E] font-extrabold text-[11px] border border-[#FCD34D]">
+                            Entrará na Fila de Espera
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-[#D8E8E1] text-[#1E4333] font-extrabold text-[11px] border border-[#8FAE9E]/40">
+                            {cotasDisponiveis} cota(s) disponível(is)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Barra de Progresso de Cotas */}
+                      <div className="w-full bg-[#E4E7EC] rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            cotasLotadas
+                              ? "bg-amber-500"
+                              : perc > 75
+                              ? "bg-[#4F93C9]"
+                              : "bg-[#8FAE9E]"
+                          }`}
+                          style={{ width: `${perc}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-[#9AA3AF]">
+                        <span>
+                          Cotas ativas: <strong className="text-[#0E1F66]">{cotasOcupadas}</strong> de {maxCotas} ({perc}%)
+                        </span>
+                        <span>
+                          Fila de espera: <strong className="text-[#0E1F66]">{selectedPonto.quantidadeFilaEspera}</strong> na fila
+                        </span>
+                      </div>
+
                       {isPontoBloqueado ? (
-                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px]">
-                          ⛔ Novas Solicitações Pausadas
-                        </span>
-                      ) : loopLotado ? (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-extrabold text-[11px]">
-                          ⏳ Entrará na Fila de Espera
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">
-                          ✓ {selectedPonto.tempoDisponivelSegundos}s disponíveis para veiculação
-                        </span>
-                      )}
+                        <p className="text-[11px] text-rose-700 font-medium bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                          O administrador deste estabelecimento pausou temporariamente o recebimento de novas campanhas. Por favor, escolha outro ponto na lista.
+                        </p>
+                      ) : cotasLotadas ? (
+                        <p className="text-[11px] text-[#92400E] font-medium bg-[#FEF3C7] p-2.5 rounded-xl border border-[#FCD34D]">
+                          Todas as {maxCotas} cotas desta TV estão preenchidas. Seu anúncio será aprovado pela moderação e colocado na <strong>Fila de Espera</strong>. Assim que uma empresa concluir a veiculação, seu anúncio começará a passar na TV automaticamente!
+                        </p>
+                      ) : null}
                     </div>
-
-                    {/* Barra de Progresso do Loop */}
-                    <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          selectedPonto.porcentagemOcupada >= 100
-                            ? "bg-amber-500"
-                            : selectedPonto.porcentagemOcupada > 75
-                            ? "bg-blue-600"
-                            : "bg-emerald-500"
-                        }`}
-                        style={{ width: `${Math.min(100, selectedPonto.porcentagemOcupada)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>
-                        Tempo ocupado: <strong>{selectedPonto.tempoOcupadoSegundos}s</strong> de{" "}
-                        {selectedPonto.limiteTempoSegundos || 360}s ({selectedPonto.porcentagemOcupada}%)
-                      </span>
-                      <span>
-                        Fila de espera: <strong>{selectedPonto.quantidadeFilaEspera}</strong> na fila
-                      </span>
-                    </div>
-
-                    {isPontoBloqueado ? (
-                      <p className="text-[11px] text-rose-700 font-medium bg-rose-50 p-2 rounded-xl border border-rose-200">
-                        O administrador deste estabelecimento pausou temporariamente o recebimento de novas campanhas. Por favor, escolha outro ponto na lista.
-                      </p>
-                    ) : loopLotado ? (
-                      <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-xl border border-amber-200">
-                        A grade de 6 minutos está ocupada. Seu anúncio será aprovado pela moderação e colocado na <strong>Fila de Espera</strong>. Assim que uma empresa concluir a veiculação, seu anúncio começará a passar na TV automaticamente!
-                      </p>
-                    ) : null}
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               <Input
@@ -314,13 +362,13 @@ function NovoAnuncioForm() {
               />
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-1.5">
                   Descrição detalhada da peça
                 </label>
                 <textarea
                   rows={3}
                   required
-                  className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  className="w-full rounded-xl border border-[#E4E7EC] p-3 text-sm text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
                   placeholder="Explique o objetivo da campanha, público-alvo, ofertas em destaque..."
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
@@ -328,11 +376,11 @@ function NovoAnuncioForm() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-2">
                   Arquivo de Mídia (Proporção recomendada: 16:9 Paisagem)
                 </label>
 
-                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-blue-500 transition bg-slate-50/50">
+                <div className="border-2 border-dashed border-[#E4E7EC] rounded-2xl p-6 text-center hover:border-[#4F93C9] transition bg-[#F7F8FA]/60">
                   <input
                     type="file"
                     id="media-upload"
@@ -344,7 +392,7 @@ function NovoAnuncioForm() {
                     htmlFor="media-upload"
                     className="cursor-pointer flex flex-col items-center justify-center"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 ring-1 ring-blue-100">
+                    <div className="w-12 h-12 rounded-2xl bg-[#4F93C9]/10 text-[#4F93C9] flex items-center justify-center mb-3 border border-[#4F93C9]/20">
                       <svg
                         className="w-6 h-6"
                         fill="none"
@@ -359,39 +407,39 @@ function NovoAnuncioForm() {
                         />
                       </svg>
                     </div>
-                    <span className="text-sm font-bold text-blue-600">
+                    <span className="text-sm font-bold text-[#4F93C9]">
                       {file ? file.name : "Clique para selecionar seu vídeo ou imagem"}
                     </span>
-                    <span className="text-xs text-slate-400 mt-1">
+                    <span className="text-xs text-[#9AA3AF] mt-1">
                       Formatos aceitos: MP4, WebM, JPG, PNG (Máx 30s para vídeos, máx 50MB)
                     </span>
                   </label>
                 </div>
 
                 {file && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3 p-3 bg-[#4F93C9]/10 border border-[#4F93C9]/30 rounded-xl text-xs">
                     <div className="flex items-center gap-2 truncate">
-                      <span className="font-bold text-blue-900">
-                        {tipoMidia === "VIDEO" ? `🎬 Vídeo Selecionado (${duracaoSegundos}s):` : "🖼️ Imagem Selecionada:"}
+                      <span className="font-bold text-[#0E1F66]">
+                        {tipoMidia === "VIDEO" ? `Vídeo Selecionado (${duracaoSegundos}s):` : "Imagem Selecionada:"}
                       </span>
-                      <span className="text-slate-700 font-semibold truncate">{file.name}</span>
-                      <span className="text-slate-400 shrink-0">
+                      <span className="text-[#344054] font-semibold truncate">{file.name}</span>
+                      <span className="text-[#9AA3AF] shrink-0">
                         ({(file.size / (1024 * 1024)).toFixed(1)} MB)
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={handleRemoveSelectedFile}
-                      className="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs transition cursor-pointer self-start sm:self-auto flex items-center gap-1 shrink-0"
+                      className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition cursor-pointer self-start sm:self-auto flex items-center gap-1 shrink-0 border border-rose-200"
                     >
-                      ✕ Remover arquivo
+                      Remover arquivo
                     </button>
                   </div>
                 )}
 
                 {previewUrl && (
                   <div className="mt-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-2">
                       Pré-visualização na Proporção da TV (16:9):
                     </p>
                     <div className="aspect-video w-full bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
@@ -422,15 +470,15 @@ function NovoAnuncioForm() {
                 <Button
                   type="submit"
                   size="lg"
-                  variant="gradient"
+                  variant="primary"
                   loading={submitting}
                   disabled={isPontoBloqueado}
                 >
                   {isPontoBloqueado
                     ? "Solicitações Bloqueadas"
-                    : loopLotado
-                    ? "Enviar para Fila de Espera ⏳"
-                    : "Enviar para Moderação 🚀"}
+                    : cotasLotadas
+                    ? "Enviar para Fila de Espera"
+                    : "Enviar para Moderação"}
                 </Button>
               </div>
             </form>

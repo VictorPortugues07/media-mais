@@ -67,7 +67,7 @@ export async function PUT(request: Request) {
     }
     if (typeof body.senha === "string" && body.senha.trim().length >= 6) {
       const bcrypt = await import("bcryptjs");
-      updateData.senha = await bcrypt.hash(body.senha.trim(), 10);
+      updateData.senha = await bcrypt.hash(body.senha.trim(), 12);
     }
 
     const updated = await prisma.user.update({

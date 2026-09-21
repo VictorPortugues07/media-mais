@@ -14,13 +14,13 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center text-center p-8 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">
+    <div className="flex flex-col items-center justify-center text-center p-8 bg-[#F7F8FA]/60 border border-dashed border-[#E4E7EC] rounded-2xl">
       {icon ? (
-        <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl mb-3 shadow-xs">
+        <div className="p-3.5 bg-[#4F93C9]/10 text-[#4F93C9] rounded-2xl mb-3 shadow-xs border border-[#4F93C9]/20">
           {icon}
         </div>
       ) : (
-        <div className="p-3.5 bg-slate-100 text-slate-400 rounded-2xl mb-3">
+        <div className="p-3.5 bg-[#F7F8FA] text-[#9AA3AF] rounded-2xl mb-3 border border-[#E4E7EC]">
           <svg
             className="w-8 h-8"
             fill="none"
@@ -36,8 +36,8 @@ export function EmptyState({
           </svg>
         </div>
       )}
-      <h4 className="text-base font-bold text-slate-800 mb-1">{title}</h4>
-      <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">{description}</p>
+      <h4 className="text-base font-bold text-[#0E1F66] font-heading mb-1">{title}</h4>
+      <p className="text-xs text-[#344054] max-w-sm mb-4 leading-relaxed">{description}</p>
       {action && <div>{action}</div>}
     </div>
   );

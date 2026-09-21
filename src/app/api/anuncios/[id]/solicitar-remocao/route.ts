@@ -53,9 +53,14 @@ export async function POST(
   }
 
   try {
-    const solicitanteDesc = isOwner
-      ? `O anunciante "${anuncio.anunciante.nomeEmpresa}" solicitou a remoção de sua campanha "${anuncio.titulo}" (TV: ${anuncio.pontoMidia.nomeEmpresa})`
-      : `O estabelecimento "${anuncio.pontoMidia.nomeEmpresa}" (${anuncio.pontoMidia.cidade}/${anuncio.pontoMidia.uf}) solicitou a remoção do anúncio "${anuncio.titulo}" de ${anuncio.anunciante.nomeEmpresa}`;
+    let solicitanteDesc = "";
+    if (isAdmin) {
+      solicitanteDesc = `A moderação/administração da plataforma solicitou a remoção do anúncio "${anuncio.titulo}" (Anunciante: ${anuncio.anunciante.nomeEmpresa} | TV: ${anuncio.pontoMidia.nomeEmpresa})`;
+    } else if (isOwner) {
+      solicitanteDesc = `O anunciante "${anuncio.anunciante.nomeEmpresa}" solicitou a remoção de sua campanha "${anuncio.titulo}" (TV: ${anuncio.pontoMidia.nomeEmpresa})`;
+    } else {
+      solicitanteDesc = `O estabelecimento "${anuncio.pontoMidia.nomeEmpresa}" (${anuncio.pontoMidia.cidade}/${anuncio.pontoMidia.uf}) solicitou a remoção do anúncio "${anuncio.titulo}" de ${anuncio.anunciante.nomeEmpresa}`;
+    }
 
     // 1. Notificar todos os administradores da plataforma com alerta prioritário
     const admins = await prisma.user.findMany({
