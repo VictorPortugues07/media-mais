@@ -184,6 +184,7 @@ model Anuncio {
   anunciante        Anunciante         @relation(fields: [anuncianteId], references: [id], onDelete: Cascade)
   pontoMidia        PontoMidia         @relation(fields: [pontoMidiaId], references: [id], onDelete: Cascade)
   registroExibicoes RegistroExibicao[]
+  cobrancas         Cobranca[]
 
   @@index([status])
   @@index([pontoMidiaId])
@@ -224,4 +225,31 @@ model Notificacao {
 
   @@index([userId, lida])
   @@map("notificacoes")
+}
+
+enum StatusCobranca {
+  PENDENTE
+  PAGO
+  EXPIRADO
+  CANCELADO
+}
+
+model Cobranca {
+  id            Int            @id @default(autoincrement())
+  anuncioId     Int            @map("anuncio_id")
+  abacateId     String         @unique @map("abacate_id")
+  valorCentavos Int            @map("valor_centavos")
+  status        StatusCobranca @default(PENDENTE)
+  brCode        String         @map("br_code")
+  brCodeBase64  String         @map("br_code_base64")
+  expiraEm      DateTime?      @map("expira_em")
+  pagoEm        DateTime?      @map("pago_em")
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
+
+  anuncio Anuncio @relation(fields: [anuncioId], references: [id], onDelete: Restrict)
+
+  @@index([anuncioId])
+  @@index([status])
+  @@map("cobrancas")
 }

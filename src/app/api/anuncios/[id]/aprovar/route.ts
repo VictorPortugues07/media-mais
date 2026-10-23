@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { notificarAprovacao } from "@/lib/notificacoes";
+import { criarNotificacao } from "@/lib/notificacoes";
 import { processarExpiracaoAnuncios } from "@/lib/expiracao";
-import { calcularPrecificacaoPonto } from "@/lib/precificacao";
 import { z } from "zod";
 import { NextRequest } from "next/server";
 
@@ -19,7 +18,7 @@ const aprovarSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getSession(request);
@@ -38,32 +37,12 @@ export async function PATCH(
     if (!parseResult.success) {
       return Response.json(
         { error: parseResult.error.issues[0]?.message || "Dados inválidos" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const body = parseResult.data;
 
-    // 1. Validação de dataFim caso fornecida
-    let calculatedDataFim: Date | null = null;
-    if (body.diasValidade) {
-      const fim = new Date();
-      fim.setDate(fim.getDate() + body.diasValidade);
-      calculatedDataFim = fim;
-    } else if (body.dataFim) {
-      const parsedDate = new Date(body.dataFim);
-      if (isNaN(parsedDate.getTime())) {
-        return Response.json({ error: "Data final inválida" }, { status: 400 });
-      }
-      if (parsedDate <= new Date()) {
-        return Response.json(
-          { error: "A data de término deve ser posterior ao momento atual" },
-          { status: 400 }
-        );
-      }
-      calculatedDataFim = parsedDate;
-    }
-
-    // 2. Transação atômica para validação e atualização
+    // Transação atômica para validação e atualização
     const resultado = await prisma.$transaction(async (tx) => {
       const anuncioExistente = await tx.anuncio.findUnique({
         where: { id: anuncioId },
@@ -82,6 +61,14 @@ export async function PATCH(
         return {
           error:
             "Anúncios rejeitados não podem ser aprovados diretamente. É necessária nova submissão pelo anunciante.",
+          status: 400,
+        };
+      }
+
+      if (anuncioExistente.status === "APROVADO") {
+        return {
+          error:
+            "Este anúncio já foi aprovado e está aguardando o pagamento do anunciante.",
           status: 400,
         };
       }
@@ -148,40 +135,22 @@ export async function PATCH(
         };
       }
 
-      const finalDataFim = calculatedDataFim ?? anuncioExistente.dataFim;
-
+      // Aprovar NÃO ativa mais o anúncio: ele fica APROVADO aguardando o PIX.
+      // A ativação (e a data final de 30 dias) acontece quando o pagamento é confirmado.
       const anuncioAprovado = await tx.anuncio.update({
         where: { id: anuncioId },
-        data: {
-          status: "ATIVO",
-          dataInicio: new Date(),
-          dataFim: finalDataFim,
-        },
+        data: { status: "APROVADO" },
         include: {
           anunciante: { include: { user: true } },
           pontoMidia: { include: { user: true } },
         },
       });
 
-      const precificacao = calcularPrecificacaoPonto({
-        fluxoDiarioEstimado: anuncioAprovado.pontoMidia.fluxoDiarioEstimado,
-        tempoPermanencia: anuncioAprovado.pontoMidia.tempoPermanencia,
-        notaFluxo: anuncioAprovado.pontoMidia.notaFluxo,
-        notaTempo: anuncioAprovado.pontoMidia.notaTempo,
-        notaPerfil: anuncioAprovado.pontoMidia.notaPerfil,
-        notaExclusividade: anuncioAprovado.pontoMidia.notaExclusividade,
-      });
-      const repasseValor = anuncioAprovado.pontoMidia.cotaMensal 
-        ? anuncioAprovado.pontoMidia.cotaMensal * 0.5 
-        : precificacao.repasseAoPonto;
-
-      await notificarAprovacao(
+      await criarNotificacao(
         anuncioAprovado.anunciante.user.id,
-        anuncioAprovado.pontoMidia.user.id,
-        anuncioAprovado.titulo,
-        anuncioAprovado.anunciante.nomeEmpresa,
-        anuncioAprovado.pontoMidia.nomeEmpresa,
-        repasseValor
+        "COBRANCA",
+        "Anúncio aprovado — falta o pagamento",
+        `Seu anúncio "${anuncioAprovado.titulo}" foi aprovado para "${anuncioAprovado.pontoMidia.nomeEmpresa}". Pague o PIX no seu painel para colocá-lo no ar.`,
       );
 
       return {
@@ -198,6 +167,9 @@ export async function PATCH(
     return Response.json(resultado, { status: 200 });
   } catch (error) {
     console.error("Aprovar error:", error);
-    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return Response.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 },
+    );
   }
 }

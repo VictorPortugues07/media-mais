@@ -318,13 +318,13 @@ export default function AdminAprovacoesPage() {
                     <div className="w-full lg:w-80 shrink-0">
                       <div className="aspect-video bg-[#0E1F66] rounded-2xl overflow-hidden shadow-xs flex items-center justify-center relative">
                         {anuncio.tipoMidia === "VIDEO" ? (
-                          <video
+                          <video preload="metadata"
                             src={anuncio.midiaUrl}
                             controls
                             className="w-full h-full object-contain"
                           />
                         ) : (
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={anuncio.midiaUrl}
                             alt={anuncio.titulo}
                             className="w-full h-full object-contain"
@@ -569,9 +569,9 @@ export default function AdminAprovacoesPage() {
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
               <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
                 {adToDelete.tipoMidia === "VIDEO" ? (
-                  <video src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
+                  <video preload="metadata" src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
                 ) : (
-                  <img src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
                 )}
               </div>
               <div className="min-w-0">

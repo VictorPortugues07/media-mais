@@ -199,6 +199,7 @@ export default function PontoPerfilPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("variante", "avatar");
 
     try {
       const res = await fetch("/api/upload", {
@@ -324,7 +325,7 @@ export default function PontoPerfilPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
                   <div className="relative">
                     {form.avatarUrl ? (
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={form.avatarUrl}
                         alt="Foto de Perfil"
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
@@ -427,7 +428,7 @@ export default function PontoPerfilPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {form.fotos.map((foto, idx) => (
                   <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-video border border-[#E4E7EC] shadow-xs bg-slate-900">
-                    <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img loading="lazy" decoding="async" src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeFoto(idx)}

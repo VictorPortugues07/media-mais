@@ -1,6 +1,7 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { otimizarImagem, otimizarVideo, type VarianteImagem } from "./media-optimize";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -20,7 +21,10 @@ export type UploadResult = {
   type: "VIDEO" | "IMAGEM";
 };
 
-export async function uploadFile(file: File): Promise<UploadResult> {
+export async function uploadFile(
+  file: File,
+  variante: VarianteImagem = "midia"
+): Promise<UploadResult> {
   if (!file || typeof file.size !== "number") {
     throw new Error("Arquivo inválido.");
   }
@@ -36,15 +40,33 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     );
   }
 
-  // A extensão é SEMPRE derivada do MIME type estrito verificado, nunca do nome enviado pelo cliente
-  const filename = `${randomUUID()}.${mimeInfo.ext}`;
   const subdir = mimeInfo.type === "VIDEO" ? "videos" : "images";
   const dirPath = path.join(UPLOAD_DIR, subdir);
 
   try {
     await mkdir(dirPath, { recursive: true });
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    let buffer: Buffer = Buffer.from(await file.arrayBuffer());
+    // A extensão é SEMPRE derivada do MIME type estrito verificado (ou do formato de saída da otimização),
+    // nunca do nome enviado pelo cliente
+    let ext = mimeInfo.ext;
+
+    if (mimeInfo.type === "IMAGEM") {
+      try {
+        buffer = await otimizarImagem(buffer, variante);
+        ext = "webp";
+      } catch {
+        throw new Error("Imagem inválida ou corrompida.");
+      }
+    } else {
+      const otimizado = await otimizarVideo(buffer, mimeInfo.ext);
+      if (otimizado) {
+        buffer = otimizado;
+        ext = "mp4";
+      }
+    }
+
+    const filename = `${randomUUID()}.${ext}`;
     const filePath = path.join(dirPath, filename);
     await writeFile(filePath, buffer);
 
@@ -54,6 +76,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
       type: mimeInfo.type,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "Imagem inválida ou corrompida.") throw error;
     // Sanitizar erro para nunca expor caminhos absolutos do servidor para o cliente
     console.error("Falha ao salvar arquivo no servidor:", error);
     throw new Error("Falha ao processar e salvar o arquivo no servidor.");

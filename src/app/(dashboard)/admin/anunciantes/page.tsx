@@ -177,7 +177,7 @@ export default function AdminAnunciantesPage() {
                 >
                   {/* Avatar / Logo */}
                   {anu.logoUrl ? (
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={anu.logoUrl}
                       alt={anu.nomeEmpresa}
                       className="w-10 h-10 rounded-xl object-cover border border-[#E4E7EC] shrink-0"
@@ -251,9 +251,9 @@ export default function AdminAnunciantesPage() {
                 <div key={ad.id} className="py-3 flex items-center gap-3.5">
                   <div className="w-16 h-11 bg-slate-900 rounded-xl overflow-hidden shrink-0 shadow-xs">
                     {ad.tipoMidia === "VIDEO" ? (
-                      <video src={ad.midiaUrl} muted className="w-full h-full object-cover" />
+                      <video preload="metadata" src={ad.midiaUrl} muted className="w-full h-full object-cover" />
                     ) : (
-                      <img src={ad.midiaUrl} alt={ad.titulo} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={ad.midiaUrl} alt={ad.titulo} className="w-full h-full object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -320,9 +320,9 @@ export default function AdminAnunciantesPage() {
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
               <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
                 {adToDelete.tipoMidia === "VIDEO" ? (
-                  <video src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
+                  <video preload="metadata" src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
                 ) : (
-                  <img src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
                 )}
               </div>
               <div className="min-w-0 flex-1">

@@ -152,6 +152,7 @@ export default function AnunciantePerfilPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("variante", "avatar");
 
     try {
       const res = await fetch("/api/upload", {
@@ -216,6 +217,7 @@ export default function AnunciantePerfilPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("variante", "avatar");
 
     try {
       const res = await fetch("/api/upload", {
@@ -340,7 +342,7 @@ export default function AnunciantePerfilPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
                   <div className="relative">
                     {form.avatarUrl ? (
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={form.avatarUrl}
                         alt="Foto de Perfil"
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
@@ -448,7 +450,7 @@ export default function AnunciantePerfilPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC] flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                     {form.logoUrl ? (
-                      <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                      <img loading="lazy" decoding="async" src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                     ) : (
                       <svg className="w-8 h-8 text-[#9AA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -476,7 +478,7 @@ export default function AnunciantePerfilPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {form.fotos.map((foto, idx) => (
                     <div key={idx} className="relative group rounded-2xl overflow-hidden aspect-video border border-[#E4E7EC] shadow-xs bg-slate-900">
-                      <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => removeFoto(idx)}

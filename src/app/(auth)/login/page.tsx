@@ -48,84 +48,99 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-flex justify-center transition-opacity hover:opacity-80">
-          <Logo className="h-8 w-auto" />
+    <div className="min-h-screen grid lg:grid-cols-[1fr_1.05fr] bg-white">
+      {/* Formulário */}
+      <div className="flex flex-col px-6 py-8 sm:px-12">
+        <Link href="/" className="inline-flex w-fit transition-opacity hover:opacity-80">
+          <Logo className="h-7 w-auto" />
         </Link>
-        <h2 className="mt-5 text-2xl font-black tracking-tight text-[#0E1F66] font-heading">
-          Acesse a plataforma
-        </h2>
-        <p className="mt-1 text-xs sm:text-sm text-[#344054]">
-          Entre com seu e-mail e senha cadastrados
-        </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-xs sm:rounded-2xl border border-[#E4E7EC]">
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {error && (
-              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-medium text-rose-700">
-                {error}
-              </div>
-            )}
+        <div className="flex flex-1 items-center">
+          <div className="mx-auto w-full max-w-sm py-12 animate-fade-in">
+            <h1 className="font-heading text-3xl font-semibold tracking-tight text-[#0E1F66]">
+              Bem-vindo de volta
+            </h1>
+            <p className="mt-2 text-[15px] text-[#667085]">Entre para acompanhar suas telas e campanhas.</p>
 
-            <Input
-              label="E-mail"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <form className="mt-9 space-y-5" onSubmit={handleSubmit}>
+              {error && (
+                <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+              )}
 
-            <Input
-              label="Senha"
-              type="password"
-              placeholder="••••••••"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-            />
+              <Input
+                label="E-mail"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
 
-            <Button
-              type="submit"
-              variant="gradient"
-              className="w-full py-2.5 mt-2"
-              loading={loading}
-            >
-              Entrar na plataforma
-            </Button>
-          </form>
+              <Input
+                label="Senha"
+                type="password"
+                placeholder="••••••••"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#E4E7EC]" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-[#9AA3AF] font-semibold tracking-wider text-[10px]">
-                  Ainda não possui conta?
-                </span>
-              </div>
-            </div>
+              <Button type="submit" variant="navy" size="lg" className="w-full" loading={loading}>
+                Entrar
+              </Button>
+            </form>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Link
-                href="/cadastro/ponto"
-                className="flex items-center justify-center px-3 py-2 border border-[#E4E7EC] rounded-xl text-xs font-semibold text-[#344054] hover:bg-[#F7F8FA] hover:text-[#0E1F66] transition text-center"
-              >
-                Cadastrar TV
-              </Link>
+            <p className="mt-10 text-sm text-[#667085]">Ainda não tem conta?</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <Link
                 href="/cadastro/anunciante"
-                className="flex items-center justify-center px-3 py-2 border border-[#4F93C9]/40 bg-[#4F93C9]/10 rounded-xl text-xs font-semibold text-[#0E1F66] hover:bg-[#4F93C9]/20 transition text-center"
+                className="rounded-xl px-3 py-2.5 text-center text-sm font-medium text-[#0E1F66] ring-1 ring-[#E4E7EC] transition hover:bg-[#F7F8FA] hover:ring-[#D5DAE3]"
               >
-                Quero Anunciar
+                Quero anunciar
+              </Link>
+              <Link
+                href="/cadastro/ponto"
+                className="rounded-xl px-3 py-2.5 text-center text-sm font-medium text-[#0E1F66] ring-1 ring-[#E4E7EC] transition hover:bg-[#F7F8FA] hover:ring-[#D5DAE3]"
+              >
+                Tenho uma TV
               </Link>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Painel da marca */}
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-[#0B1A57] p-12 text-white">
+        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(90%_70%_at_100%_0%,rgba(79,147,201,0.35),transparent_60%)]" />
+        <div aria-hidden="true" className="absolute inset-0 opacity-40 [background-image:radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
+
+        <p className="relative text-sm text-white/60">Rede Media+</p>
+
+        <div className="relative">
+          <div className="rounded-2xl bg-[#05092A] p-2 shadow-2xl ring-1 ring-white/10 animate-float-slow">
+            <div className="relative aspect-video overflow-hidden rounded-xl">
+              <img
+                src="/uploads/demo/anuncios/meganutri-creatina.webp"
+                alt="Anúncio exibido na rede Media+"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-medium backdrop-blur-md">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#8FAE9E] animate-pulse" />
+                Ao vivo
+              </span>
+            </div>
+          </div>
+          <h2 className="mt-12 font-heading text-4xl font-semibold leading-[1.1] tracking-tight">
+            Sua marca onde as pessoas estão.
+          </h2>
+          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-white/65">
+            Acompanhe exibições, aprove anúncios e gerencie suas telas em um só lugar.
+          </p>
+        </div>
+
+        <p className="relative text-xs text-white/40">© {new Date().getFullYear()} Media+</p>
       </div>
     </div>
   );

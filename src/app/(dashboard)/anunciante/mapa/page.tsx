@@ -106,7 +106,7 @@ export default function AnuncianteMapaPage() {
               <CardHeader className="bg-[#F7F8FA] border-b border-[#E4E7EC]">
                 <div className="flex items-start gap-3">
                   {selectedPonto.fotos && selectedPonto.fotos.length > 0 ? (
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={selectedPonto.fotos[0]}
                       alt={selectedPonto.nomeEmpresa}
                       className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md shrink-0"
@@ -179,7 +179,7 @@ export default function AnuncianteMapaPage() {
                     </p>
                     {/* Imagem Principal Grande */}
                     <div className="rounded-2xl overflow-hidden aspect-video border border-[#E4E7EC] bg-slate-950 shadow-xs mb-2 group relative">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={selectedPonto.fotos[0]}
                         alt="Foto Principal"
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
@@ -197,7 +197,7 @@ export default function AnuncianteMapaPage() {
                             key={idx}
                             className="rounded-xl overflow-hidden aspect-video border border-[#E4E7EC] bg-slate-900 shadow-xs hover:border-[#4F93C9] transition"
                           >
-                            <img
+                            <img loading="lazy" decoding="async"
                               src={foto}
                               alt={`Espaço ${idx + 2}`}
                               className="w-full h-full object-cover"

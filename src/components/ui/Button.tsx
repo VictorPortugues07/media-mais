@@ -19,33 +19,33 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseStyles =
-    "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs";
+    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] rounded-xl transition-all duration-200 ease-out focus:outline-none focus-visible:ring-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.98]";
 
   const variants = {
     primary:
-      "bg-[#4F93C9] hover:bg-[#3D82B5] text-white shadow-sm shadow-[#4F93C9]/25 focus:ring-[#4F93C9]",
+      "bg-[#4F93C9] hover:bg-[#3D82B5] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(14_31_102/0.12)] focus-visible:ring-[#4F93C9]/25",
     navy:
-      "bg-[#0E1F66] hover:bg-[#0A174E] text-white shadow-sm shadow-[#0E1F66]/20 focus:ring-[#0E1F66]",
+      "bg-[#0E1F66] hover:bg-[#16297A] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(14_31_102/0.2)] focus-visible:ring-[#0E1F66]/20",
     gradient:
-      "bg-brand-gradient hover:bg-brand-gradient-hover text-white shadow-md shadow-[#0E1F66]/20 focus:ring-[#4F93C9]",
+      "bg-brand-gradient hover:bg-brand-gradient-hover text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15),0_2px_6px_-1px_rgb(14_31_102/0.25)] focus-visible:ring-[#4F93C9]/25",
     secondary:
-      "border border-[#E4E7EC] bg-white hover:bg-[#F7F8FA] text-[#344054] hover:text-[#0E1F66] focus:ring-[#4F93C9]",
+      "border border-[#E4E7EC] bg-white hover:bg-[#F7F8FA] hover:border-[#D5DAE3] text-[#344054] hover:text-[#0E1F66] shadow-2xs focus-visible:ring-[#4F93C9]/15",
     "outline-brand":
-      "border border-[#4F93C9]/40 bg-[#4F93C9]/10 hover:bg-[#4F93C9]/20 text-[#0E1F66] focus:ring-[#4F93C9]",
+      "border border-[#4F93C9]/25 bg-[#4F93C9]/[0.07] hover:bg-[#4F93C9]/15 text-[#0E1F66] focus-visible:ring-[#4F93C9]/20",
     teal:
-      "bg-[#8FAE9E] hover:bg-[#7A9C8D] text-white shadow-sm focus:ring-[#8FAE9E]",
+      "bg-[#6F9483] hover:bg-[#5E8473] text-white shadow-2xs focus-visible:ring-[#8FAE9E]/30",
     danger:
-      "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20 focus:ring-rose-500",
+      "bg-rose-600 hover:bg-rose-700 text-white shadow-2xs focus-visible:ring-rose-500/25",
     ghost:
-      "text-[#344054] hover:bg-slate-100/80 hover:text-[#0E1F66] focus:ring-slate-400 shadow-none",
+      "text-[#344054] hover:bg-[#0E1F66]/[0.05] hover:text-[#0E1F66] focus-visible:ring-slate-300/40",
     success:
-      "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 focus:ring-emerald-500",
+      "bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs focus-visible:ring-emerald-500/25",
   };
 
   const sizes = {
     sm: "px-3.5 py-1.5 text-xs gap-1.5 rounded-lg",
     md: "px-4 py-2 text-sm gap-2 rounded-xl",
-    lg: "px-6 py-3 text-base gap-2.5 rounded-xl font-bold",
+    lg: "px-6 py-3 text-[15px] gap-2.5 rounded-xl",
   };
 
   return (

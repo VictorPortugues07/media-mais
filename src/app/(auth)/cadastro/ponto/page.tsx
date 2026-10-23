@@ -150,7 +150,7 @@ export default function CadastroPontoPage() {
           <Link href="/" className="inline-flex justify-center transition-opacity hover:opacity-80">
             <Logo className="h-8 w-auto" />
           </Link>
-          <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-[#0E1F66] font-heading">
+          <h2 className="mt-4 text-2xl sm:text-[32px] font-semibold tracking-tight text-[#0E1F66] font-heading">
             Cadastre seu Estabelecimento com TV
           </h2>
           <p className="mt-1 text-xs sm:text-sm text-[#344054]">
@@ -176,7 +176,7 @@ export default function CadastroPontoPage() {
 
             {/* Dados de Acesso */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-[#8FAE9E]/20 text-[#1E4333] font-black flex items-center justify-center text-[10px] border border-[#8FAE9E]/40">1</span>
                 Dados de Acesso
               </h3>
@@ -221,7 +221,7 @@ export default function CadastroPontoPage() {
 
             {/* Dados do Estabelecimento */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-[#8FAE9E]/20 text-[#1E4333] font-black flex items-center justify-center text-[10px] border border-[#8FAE9E]/40">2</span>
                 Informações do Estabelecimento
               </h3>
@@ -350,7 +350,7 @@ export default function CadastroPontoPage() {
 
             {/* TVs e Audiência */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-[#8FAE9E]/20 text-[#1E4333] font-black flex items-center justify-center text-[10px] border border-[#8FAE9E]/40">3</span>
                 TVs e Perfil de Audiência
               </h3>

@@ -185,32 +185,24 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
 
   const navItems = links[role] || [];
 
-  const roleConfig = {
-    ANUNCIANTE: {
-      label: "Anunciante",
-      badgeClass: "bg-[#4F93C9]/20 text-[#8ec3ea] border-[#4F93C9]/40",
-    },
-    PONTO: {
-      label: "Dono de TV",
-      badgeClass: "bg-[#8FAE9E]/20 text-[#c8e2d6] border-[#8FAE9E]/40",
-    },
-    ADMIN: {
-      label: "Administrador",
-      badgeClass: "bg-[#F2795C]/20 text-[#f7a895] border-[#F2795C]/40",
-    },
+  const roleLabel = {
+    ANUNCIANTE: "Painel do anunciante",
+    PONTO: "Painel do estabelecimento",
+    ADMIN: "Administração",
   }[role];
 
   return (
     <>
-      {/* Mobile Topbar com fundo branco e logo destacado */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white z-30 px-4 flex items-center justify-between border-b border-[#E4E7EC] shadow-xs">
-        <div className="flex items-center gap-3">
+      {/* Mobile Topbar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white/85 backdrop-blur-lg z-30 px-3 flex items-center justify-between border-b border-[#E4E7EC]/80">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-[#344054] hover:text-[#4F93C9] cursor-pointer"
+            aria-label="Abrir menu"
+            className="p-2 rounded-lg text-[#344054] hover:bg-[#0E1F66]/[0.05] cursor-pointer"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 7h16M4 12h16M4 17h10" />
             </svg>
           </button>
           <Logo className="h-6 w-auto" whiteText={false} />
@@ -221,49 +213,44 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
       {/* Backdrop for Mobile */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-40"
+          className="lg:hidden fixed inset-0 bg-[#0A1240]/40 backdrop-blur-[2px] z-40 animate-fade-in"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar Container - Brand Navy #0E1F66 */}
+      {/* Sidebar — Brand Navy */}
       <aside
         className={cn(
-          "fixed top-0 bottom-0 left-0 w-64 bg-gradient-to-b from-[#0E1F66] to-[#081342] text-white/80 z-50 flex flex-col transition-transform duration-300 ease-in-out border-r border-white/10 shadow-xl",
+          "fixed top-0 bottom-0 left-0 w-64 bg-[#0B1A57] text-white/80 z-50 flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        {/* Brand Header & Role Badge */}
-        <div className="p-5 border-b border-white/10">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_0%,rgba(79,147,201,0.18),transparent_60%)]"
+        />
+
+        {/* Marca */}
+        <div className="relative px-6 pt-6 pb-5">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center">
               <Logo className="h-7 w-auto" whiteText={true} />
             </Link>
             <button
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden text-white/60 hover:text-white"
+              aria-label="Fechar menu"
+              className="lg:hidden p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border",
-                roleConfig.badgeClass
-              )}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              {roleConfig.label}
-            </span>
-          </div>
+          <p className="mt-3 text-[11px] font-medium text-white/45">{roleLabel}</p>
         </div>
 
-        {/* Nav Links */}
-        <nav className="flex-1 px-3.5 py-4 space-y-1 overflow-y-auto">
+        {/* Navegação */}
+        <nav className="relative flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
             return (
@@ -273,51 +260,56 @@ export function Sidebar({ role, userName, userEmail, userAvatar, pontoId }: Side
                 target={(item as { target?: string }).target}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 relative",
+                  "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors duration-150 relative [&_svg]:w-[18px] [&_svg]:h-[18px]",
                   isActive
-                    ? "bg-[#4F93C9] text-white shadow-sm shadow-[#4F93C9]/30"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                    ? "bg-white/[0.09] text-white"
+                    : "text-white/60 hover:bg-white/[0.05] hover:text-white"
                 )}
               >
-                {isActive && (
-                  <span className="absolute right-2 w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" />
-                )}
-                {item.icon}
+                <span
+                  className={cn(
+                    "absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[#4F93C9] transition-opacity",
+                    isActive ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                <span className={cn(isActive ? "text-[#8EC3EA]" : "text-white/45 group-hover:text-white/80")}>
+                  {item.icon}
+                </span>
                 <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* User Footer Minimalista */}
-        <div className="p-4 border-t border-white/10 bg-black/20 space-y-3">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-white/5 border border-white/10">
+        {/* Usuário */}
+        <div className="relative p-3 border-t border-white/[0.08]">
+          <div className="flex items-center gap-3 px-2 py-2">
             {userAvatar ? (
-              <img
+              <img loading="lazy" decoding="async"
                 src={userAvatar}
                 alt={userName}
-                className="w-7 h-7 rounded-full object-cover border border-white/20 shrink-0"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-white/10 shrink-0"
               />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">
+              <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold text-white/80 shrink-0">
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{userName}</p>
-              <p className="text-[10px] text-white/50 truncate">{userEmail}</p>
+              <p className="text-[13px] font-medium text-white truncate">{userName}</p>
+              <p className="text-[11px] text-white/45 truncate">{userEmail}</p>
             </div>
+            <button
+              onClick={handleLogout}
+              title="Sair da conta"
+              aria-label="Sair da conta"
+              className="p-2 rounded-lg text-white/45 hover:text-[#F7A895] hover:bg-white/[0.06] transition cursor-pointer"
+            >
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#f7a895] hover:bg-[#F2795C]/15 transition border border-[#F2795C]/20 cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>Sair da conta</span>
-          </button>
         </div>
       </aside>
     </>

@@ -444,13 +444,13 @@ function NovoAnuncioForm() {
                     </p>
                     <div className="aspect-video w-full bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
                       {tipoMidia === "VIDEO" ? (
-                        <video
+                        <video preload="metadata"
                           src={previewUrl}
                           controls
                           className="w-full h-full object-contain"
                         />
                       ) : (
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={previewUrl}
                           alt="Preview"
                           className="w-full h-full object-contain"

@@ -158,7 +158,7 @@ export default function CadastroAnunciantePage() {
           <Link href="/" className="inline-flex justify-center transition-opacity hover:opacity-80">
             <Logo className="h-8 w-auto" />
           </Link>
-          <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-[#0E1F66] font-heading">
+          <h2 className="mt-4 text-2xl sm:text-[32px] font-semibold tracking-tight text-[#0E1F66] font-heading">
             Cadastre-se como Anunciante
           </h2>
           <p className="mt-1 text-xs sm:text-sm text-[#344054]">
@@ -184,8 +184,8 @@ export default function CadastroAnunciantePage() {
 
             {/* Acesso */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">1</span>
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-[#0E1F66] text-white font-medium flex items-center justify-center text-[11px]">1</span>
                 Dados de Acesso
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -229,8 +229,8 @@ export default function CadastroAnunciantePage() {
 
             {/* Empresa */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">2</span>
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-[#0E1F66] text-white font-medium flex items-center justify-center text-[11px]">2</span>
                 Informações da sua Empresa
               </h3>
               <div className="space-y-4">
@@ -341,8 +341,8 @@ export default function CadastroAnunciantePage() {
 
             {/* O que pretende anunciar */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0E1F66] mb-3 flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#4F93C9]/15 text-[#0E1F66] font-black flex items-center justify-center text-[10px] border border-[#4F93C9]/30">3</span>
+              <h3 className="font-heading text-[15px] font-semibold text-[#0E1F66] mb-4 flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-[#0E1F66] text-white font-medium flex items-center justify-center text-[11px]">3</span>
                 Objetivos de Divulgação
               </h3>
               <div className="space-y-4">

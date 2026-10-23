@@ -1,22 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { processarExpiracaoAnuncios } from "@/lib/expiracao";
-import { calcularPrecificacaoPonto } from "@/lib/precificacao";
+import { criarNotificacao } from "@/lib/notificacoes";
 import { z } from "zod";
 import { NextRequest } from "next/server";
 
+// diasValidade/dataFim continuam aceitos por compatibilidade, mas a veiculação
+// paga sempre dura 30 dias a partir da ativação.
 const promoverFilaSchema = z.object({
-  diasValidade: z
-    .number()
-    .int("Dias de validade deve ser um número inteiro")
-    .positive("Dias de validade deve ser positivo")
-    .optional(),
+  diasValidade: z.number().int().positive().optional(),
   dataFim: z.string().optional(),
 });
 
 export async function POST(
   request: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getSession(request);
@@ -35,25 +33,8 @@ export async function POST(
     if (!parseResult.success) {
       return Response.json(
         { error: parseResult.error.issues[0]?.message || "Dados inválidos" },
-        { status: 400 }
+        { status: 400 },
       );
-    }
-    const body = parseResult.data;
-
-    let calculatedDataFim: Date | null = null;
-    if (body.diasValidade) {
-      const fim = new Date();
-      fim.setDate(fim.getDate() + body.diasValidade);
-      calculatedDataFim = fim;
-    } else if (body.dataFim) {
-      const parsedDate = new Date(body.dataFim);
-      if (isNaN(parsedDate.getTime()) || parsedDate <= new Date()) {
-        return Response.json(
-          { error: "A data final deve ser uma data futura válida" },
-          { status: 400 }
-        );
-      }
-      calculatedDataFim = parsedDate;
     }
 
     // Transação atômica para verificar capacidade e promover
@@ -103,14 +84,47 @@ export async function POST(
         };
       }
 
-      const finalDataFim = calculatedDataFim ?? anuncio.dataFim;
+      // Já pagou? (PIX confirmado enquanto aguardava vaga)
+      const pagamentoConfirmado = await tx.cobranca.findFirst({
+        where: { anuncioId, status: "PAGO" },
+        select: { id: true },
+      });
 
+      if (!pagamentoConfirmado) {
+        // Ainda não pagou: libera para pagamento (o PIX ativa o anúncio automaticamente)
+        const aguardando = await tx.anuncio.update({
+          where: { id: anuncioId },
+          data: { status: "APROVADO" },
+          include: {
+            anunciante: { include: { user: true } },
+            pontoMidia: { include: { user: true } },
+          },
+        });
+
+        await criarNotificacao(
+          aguardando.anunciante.user.id,
+          "COBRANCA",
+          "Vaga liberada — falta o pagamento",
+          `Abriu uma vaga na TV "${aguardando.pontoMidia.nomeEmpresa}" para a campanha "${aguardando.titulo}". Pague o PIX no seu painel para colocá-la no ar.`,
+        );
+
+        return {
+          success: true,
+          anuncio: aguardando,
+          message:
+            "Vaga liberada. O anunciante foi avisado para efetuar o pagamento.",
+          status: 200,
+        };
+      }
+
+      // Já pagou: entra no ar agora, com 30 dias de veiculação
+      const agora = new Date();
       const updated = await tx.anuncio.update({
         where: { id: anuncioId },
         data: {
           status: "ATIVO",
-          dataInicio: new Date(),
-          dataFim: finalDataFim,
+          dataInicio: agora,
+          dataFim: new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000),
         },
         include: {
           anunciante: { include: { user: true } },
@@ -118,19 +132,6 @@ export async function POST(
         },
       });
 
-      const precificacao = calcularPrecificacaoPonto({
-        fluxoDiarioEstimado: updated.pontoMidia.fluxoDiarioEstimado,
-        tempoPermanencia: updated.pontoMidia.tempoPermanencia,
-        notaFluxo: updated.pontoMidia.notaFluxo,
-        notaTempo: updated.pontoMidia.notaTempo,
-        notaPerfil: updated.pontoMidia.notaPerfil,
-        notaExclusividade: updated.pontoMidia.notaExclusividade,
-      });
-      const repasseValor = updated.pontoMidia.cotaMensal 
-        ? updated.pontoMidia.cotaMensal * 0.5 
-        : precificacao.repasseAoPonto;
-
-      // Notificações
       await tx.notificacao.create({
         data: {
           userId: updated.anunciante.user.id,
@@ -145,7 +146,7 @@ export async function POST(
           userId: updated.pontoMidia.user.id,
           tipo: "NOVO_ANUNCIO_TV",
           titulo: "Novo anúncio ativo na sua TV",
-          mensagem: `Novo anunciante na sua TV! O anúncio "${updated.titulo}" de "${updated.anunciante.nomeEmpresa}" foi promovido da fila de espera. Você começará a receber + ${repasseValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} mensais na sua conta.`,
+          mensagem: `O anúncio "${updated.titulo}" de "${updated.anunciante.nomeEmpresa}" foi promovido da fila de espera e já está na sua TV.`,
         },
       });
 
@@ -164,6 +165,9 @@ export async function POST(
     return Response.json(resultado, { status: 200 });
   } catch (error) {
     console.error("Promover fila error:", error);
-    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return Response.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 },
+    );
   }
 }

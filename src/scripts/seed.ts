@@ -1,623 +1,362 @@
 ﻿import { prisma } from "../lib/prisma";
 import { hash } from "bcryptjs";
+import type { TipoNotificacao } from "@prisma/client";
 import { calcularScorePonderado, determinarTier } from "../lib/precificacao";
+import {
+  PONTOS,
+  ANUNCIANTES,
+  ANUNCIOS,
+  SENHA_PONTO,
+  SENHA_ANUNCIANTE,
+  avatarUrl,
+  fotoPontoUrl,
+  fotoAnuncianteUrl,
+  logoUrl,
+  midiaAnuncioUrl,
+} from "./demo-data";
+
+/**
+ * Seed de DEMONSTRAÇÃO da plataforma Media+.
+ *
+ * ATENÇÃO: apaga TODOS os dados do banco (usuários, pontos, anunciantes, anúncios,
+ * exibições e notificações) e recria um cenário completo para apresentação.
+ * As mídias usadas ficam em public/uploads/demo (geradas por `npm run demo:midia`).
+ */
+
+const DIA = 24 * 60 * 60 * 1000;
+const agora = new Date();
+const diasAtras = (d: number, hora = 10) => {
+  const dt = new Date(agora.getTime() - d * DIA);
+  dt.setHours(hora, 0, 0, 0);
+  return dt;
+};
+
+// PRNG determinístico: o seed gera sempre os mesmos números
+let semente = 20261023;
+const aleatorio = () => {
+  semente = (semente * 1664525 + 1013904223) % 4294967296;
+  return semente / 4294967296;
+};
+const entre = (min: number, max: number) => Math.floor(min + aleatorio() * (max - min + 1));
+
+async function limparBanco() {
+  // CASCADE também limpa tabelas dependentes (ex.: cobrancas, se existir)
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE registros_exibicao, notificacoes, anuncios, anunciantes, pontos_midia, users RESTART IDENTITY CASCADE`
+  );
+}
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORCE !== "1") {
+    throw new Error("Seed de demonstração bloqueado em produção (apaga o banco). Use SEED_FORCE=1 se tiver certeza.");
+  }
+
   console.log("=========================================");
-  console.log("  Iniciando Seed da Plataforma Media+   ");
+  console.log("  Seed de Demonstração — Media+          ");
   console.log("=========================================\n");
+
+  await limparBanco();
+  console.log("[RESET] Banco limpo.\n");
 
   const adminEmail = process.env.ADMIN_EMAIL || "admin@mediamais.com";
   const adminRawPassword = process.env.ADMIN_PASSWORD || "mediamais2026";
-  const defaultPontoPassword = await hash("ponto123", 12);
-  const defaultAnunciantePassword = await hash("anunciante123", 12);
+  const [senhaAdmin, senhaPonto, senhaAnunciante] = await Promise.all([
+    hash(adminRawPassword, 12),
+    hash(SENHA_PONTO, 12),
+    hash(SENHA_ANUNCIANTE, 12),
+  ]);
 
   // ─────────────────────────────────────────────────────────────
   // 1. ADMINISTRADOR
   // ─────────────────────────────────────────────────────────────
-  const adminPassword = await hash(adminRawPassword, 12);
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      nome: "Administrador Media+",
-      ativo: true,
-      senha: adminPassword,
-    },
-    create: {
+  const admin = await prisma.user.create({
+    data: {
       email: adminEmail,
-      senha: adminPassword,
+      senha: senhaAdmin,
       nome: "Administrador Media+",
       whatsapp: "(48) 98879-6514",
+      avatarUrl: avatarUrl("admin"),
       role: "ADMIN",
-      ativo: true,
+      criadoEm: diasAtras(90),
     },
   });
-  console.log(`[ADMIN] ${admin.email} (Senha: ${adminRawPassword})`);
+  console.log(`[ADMIN] ${admin.email} (senha: ${adminRawPassword})`);
 
   // ─────────────────────────────────────────────────────────────
-  // 2. DONOS DE PONTO DE MÍDIA (ESTABELECIMENTOS COM SMART TV)
+  // 2. PONTOS DE MÍDIA
   // ─────────────────────────────────────────────────────────────
-  const pontosConfig = [
-    {
-      email: "academia@exemplo.com",
-      nomeUsuario: "Carlos Silva",
-      whatsapp: "(48) 99123-4567",
-      nomeEmpresa: "Academia Iron Fitness",
-      categoria: "Academia / Crossfit",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Centro",
-      rua: "Av. Mauro Ramos",
-      numero: "1200",
-      cep: "88015200",
-      codigoTv: "100001",
-      status: "ATIVO" as const,
-      ativo: true,
-      descricao: "Academia completa com alto fluxo de jovens e adultos em busca de saúde e nutrição.",
-      fluxoDiarioEstimado: "300-500 pessoas",
-      tempoPermanencia: "1-2 horas",
-      faixaEtariaPublico: ["18-25 anos", "26-35 anos", "36-45 anos"],
-      generoPublico: "Misto (equilibrado)",
-      fotos: ["/uploads/images/1cc71ba3-9dd5-4d9d-8fd8-57442db3f23f.jpg"],
-      lat: -27.5954,
-      lng: -48.548,
-      notaFluxo: 4.5,
-      notaTempo: 4.5,
-      notaPerfil: 4.5,
-      notaExclusividade: 4.5,
-      tipoDispositivo: "SMART_TV",
-      resolucaoTela: "1920x1080",
-    },
-    {
-      email: "restaurante@exemplo.com",
-      nomeUsuario: "Marcos Oliveira",
-      whatsapp: "(48) 99234-5678",
-      nomeEmpresa: "Restaurante Villa Gourmet",
-      categoria: "Restaurante / Bar",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Beira-Mar",
-      rua: "Av. Beira Mar Norte",
-      numero: "2500",
-      cep: "88015400",
-      codigoTv: "100002",
-      status: "ATIVO" as const,
-      ativo: true,
-      descricao: "Restaurante executivo com almoço movimentado e happy hour com público qualificado.",
-      fluxoDiarioEstimado: "150-300 pessoas",
-      tempoPermanencia: "45-60 min",
-      faixaEtariaPublico: ["26-35 anos", "36-45 anos", "46+ anos"],
-      generoPublico: "Misto (equilibrado)",
-      fotos: ["/uploads/images/3d2f7a19-f44f-4990-b5f4-be653f0b5468.jpg"],
-      lat: -27.585,
-      lng: -48.552,
-      notaFluxo: 4.0,
-      notaTempo: 3.5,
-      notaPerfil: 4.0,
-      notaExclusividade: 3.5,
-      tipoDispositivo: "SMART_TV",
-      resolucaoTela: "1920x1080",
-    },
-    {
-      email: "clinica@exemplo.com",
-      nomeUsuario: "Dra. Renata Vasconcelos",
-      whatsapp: "(48) 99345-6789",
-      nomeEmpresa: "Clínica OdontoCenter Premium",
-      categoria: "Clinica Medica / Odonto",
-      cidade: "São José",
-      uf: "SC",
-      bairro: "Campinas",
-      rua: "Av. Presidente Kennedy",
-      numero: "450",
-      cep: "88101000",
-      codigoTv: "100003",
-      status: "ATIVO" as const,
-      ativo: true,
-      descricao: "Clínica de estética e odontologia com sala de espera com alto poder aquisitivo.",
-      fluxoDiarioEstimado: "50-150 pessoas",
-      tempoPermanencia: "30-45 min",
-      faixaEtariaPublico: ["26-35 anos", "36-45 anos", "46+ anos"],
-      generoPublico: "Maioria feminino",
-      fotos: ["/uploads/images/8077e6ea-a004-4805-a1d1-1ce9b255ed72.jpg"],
-      lat: -27.592,
-      lng: -48.618,
-      notaFluxo: 4.5,
-      notaTempo: 5.0,
-      notaPerfil: 5.0,
-      notaExclusividade: 4.0,
-      tipoDispositivo: "SMART_TV",
-      resolucaoTela: "1920x1080",
-    },
-    {
-      email: "barbearia@exemplo.com",
-      nomeUsuario: "Rodrigo Almeida",
-      whatsapp: "(48) 99456-7890",
-      nomeEmpresa: "Barbearia Don Corleone",
-      categoria: "Salao / Barbearia",
-      cidade: "Palhoça",
-      uf: "SC",
-      bairro: "Pagani",
-      rua: "Av. Atílio Pedro Pagani",
-      numero: "800",
-      cep: "88132149",
-      codigoTv: "100004",
-      status: "ATIVO" as const,
-      ativo: true,
-      descricao: "Barbearia conceito com jogos, sinuca e público masculino constante durante todo o dia.",
-      fluxoDiarioEstimado: "50-150 pessoas",
-      tempoPermanencia: "30-45 min",
-      faixaEtariaPublico: ["18-25 anos", "26-35 anos", "36-45 anos"],
-      generoPublico: "Maioria masculino",
-      fotos: ["/uploads/images/b86f67d1-2f7d-4903-89d3-88e5c42139f8.jpg"],
-      lat: -27.644,
-      lng: -48.669,
-      notaFluxo: 3.0,
-      notaTempo: 3.0,
-      notaPerfil: 3.0,
-      notaExclusividade: 3.0,
-      tipoDispositivo: "DESKTOP",
-      resolucaoTela: "1920x1080",
-    },
-    {
-      email: "cafe@exemplo.com",
-      nomeUsuario: "Fernanda Costa",
-      whatsapp: "(48) 99567-8901",
-      nomeEmpresa: "Café & Bistrô Aroma",
-      categoria: "Cafeteria / Padaria",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Lagoa da Conceição",
-      rua: "Rua Afonso Delambert Neto",
-      numero: "310",
-      cep: "88062000",
-      codigoTv: "100005",
-      status: "PENDENTE" as const, // Para testar aprovação pelo Admin
-      ativo: true,
-      descricao: "Café aconchegante com espaço coworking e turistas ao longo de todo o ano.",
-      fluxoDiarioEstimado: "150-300 pessoas",
-      tempoPermanencia: "45-60 min",
-      faixaEtariaPublico: ["18-25 anos", "26-35 anos", "36-45 anos"],
-      generoPublico: "Misto (equilibrado)",
-      fotos: ["/uploads/images/ba8a4a0f-be91-4eb1-9090-acee6b130c6d.jpg"],
-      lat: -27.604,
-      lng: -48.468,
-      notaFluxo: 3.2,
-      notaTempo: 3.5,
-      notaPerfil: 3.5,
-      notaExclusividade: 3.0,
-      tipoDispositivo: "SMART_TV",
-      resolucaoTela: "1920x1080",
-    },
-    {
-      email: "inativo@exemplo.com",
-      nomeUsuario: "Luiz Fernando",
-      whatsapp: "(48) 99678-9012",
-      nomeEmpresa: "Empório Sul Conveniência",
-      categoria: "Outros",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Estreito",
-      rua: "Rua Fúlvio Aducci",
-      numero: "600",
-      cep: "88075000",
-      codigoTv: "100006",
-      status: "INATIVO" as const, // Ponto e usuário desativados para testar bloqueios
-      ativo: false,
-      descricao: "Ponto comercial desativado temporariamente para manutenção.",
-      fluxoDiarioEstimado: "Até 50 pessoas",
-      tempoPermanencia: "15-30 min",
-      faixaEtariaPublico: ["26-35 anos"],
-      generoPublico: "Misto (equilibrado)",
-      fotos: [],
-      lat: -27.587,
-      lng: -48.579,
-      notaFluxo: 2.5,
-      notaTempo: 2.5,
-      notaPerfil: 2.5,
-      notaExclusividade: 2.5,
-      tipoDispositivo: null,
-      resolucaoTela: null,
-    },
-  ];
+  const pontos: Record<string, { id: number; userId: number; nomeEmpresa: string; abertura: number; fechamento: number; fluxo: number }> = {};
 
-  const pontosSalvos: Record<string, any> = {};
+  for (const [i, p] of PONTOS.entries()) {
+    const [notaFluxo, notaTempo, notaPerfil, notaExclusividade] = p.notas;
+    const score = calcularScorePonderado(notaFluxo, notaTempo, notaPerfil, notaExclusividade);
+    const tier = determinarTier(score);
+    const criadoEm = diasAtras(60 - i * 3);
 
-  for (const p of pontosConfig) {
-    const user = await prisma.user.upsert({
-      where: { email: p.email },
-      update: {
-        nome: `${p.nomeUsuario} (${p.nomeEmpresa})`,
-        whatsapp: p.whatsapp,
-        ativo: p.ativo,
-        senha: defaultPontoPassword,
-      },
-      create: {
+    const user = await prisma.user.create({
+      data: {
         email: p.email,
-        senha: defaultPontoPassword,
-        nome: `${p.nomeUsuario} (${p.nomeEmpresa})`,
+        senha: senhaPonto,
+        nome: p.responsavel,
         whatsapp: p.whatsapp,
+        avatarUrl: avatarUrl(p.avatar),
         role: "PONTO",
-        ativo: p.ativo,
+        ativo: p.status !== "INATIVO",
+        criadoEm,
       },
     });
 
-    const score = calcularScorePonderado(p.notaFluxo, p.notaTempo, p.notaPerfil, p.notaExclusividade);
-    const tierInfo = determinarTier(score);
-
-    const ponto = await prisma.pontoMidia.upsert({
-      where: { userId: user.id },
-      update: {
-        nomeEmpresa: p.nomeEmpresa,
-        responsavel: p.nomeUsuario,
-        whatsapp: p.whatsapp,
-        cidade: p.cidade,
-        uf: p.uf,
-        bairro: p.bairro,
-        rua: p.rua,
-        numero: p.numero,
-        cep: p.cep,
-        codigoTv: p.codigoTv,
-        status: p.status,
-        descricao: p.descricao,
-        fluxoDiarioEstimado: p.fluxoDiarioEstimado,
-        tempoPermanencia: p.tempoPermanencia,
-        faixaEtariaPublico: p.faixaEtariaPublico,
-        generoPublico: p.generoPublico,
-        fotos: p.fotos,
-        lat: p.lat,
-        lng: p.lng,
-        notaFluxo: p.notaFluxo,
-        notaTempo: p.notaTempo,
-        notaPerfil: p.notaPerfil,
-        notaExclusividade: p.notaExclusividade,
-        scorePonderado: score,
-        tier: tierInfo.tier,
-        cotaMensal: tierInfo.cotaMensal,
-        tipoDispositivo: p.tipoDispositivo,
-        resolucaoTela: p.resolucaoTela,
-        ultimaAtividade: p.status === "ATIVO" ? new Date() : null,
-      },
-      create: {
+    const ponto = await prisma.pontoMidia.create({
+      data: {
         userId: user.id,
+        codigoTv: p.codigoTv,
         nomeEmpresa: p.nomeEmpresa,
-        responsavel: p.nomeUsuario,
+        responsavel: p.responsavel,
         whatsapp: p.whatsapp,
-        cidade: p.cidade,
-        uf: p.uf,
-        bairro: p.bairro,
+        instagramSite: p.instagramSite,
+        cep: p.cep,
         rua: p.rua,
         numero: p.numero,
-        cep: p.cep,
+        bairro: p.bairro,
+        cidade: p.cidade,
+        uf: p.uf,
         categoria: p.categoria,
-        codigoTv: p.codigoTv,
-        status: p.status,
         descricao: p.descricao,
         possuiTv: true,
-        quantidadeTvs: 2,
-        localInstalacao: "Salão Principal / Recepção",
+        quantidadeTvs: p.quantidadeTvs,
+        localInstalacao: p.localInstalacao,
         fluxoDiarioEstimado: p.fluxoDiarioEstimado,
         tempoPermanencia: p.tempoPermanencia,
         faixaEtariaPublico: p.faixaEtariaPublico,
         generoPublico: p.generoPublico,
-        fotos: p.fotos,
+        horariosPico: p.horariosPico,
+        horarioAbertura: p.horarioAbertura,
+        horarioFechamento: p.horarioFechamento,
+        diasFuncionamento: p.diasFuncionamento,
+        fotos: p.fotos.map(fotoPontoUrl),
         lat: p.lat,
         lng: p.lng,
-        notaFluxo: p.notaFluxo,
-        notaTempo: p.notaTempo,
-        notaPerfil: p.notaPerfil,
-        notaExclusividade: p.notaExclusividade,
+        status: p.status,
+        aceitaNovosAnuncios: p.status === "ATIVO",
+        notaFluxo,
+        notaTempo,
+        notaPerfil,
+        notaExclusividade,
         scorePonderado: score,
-        tier: tierInfo.tier,
-        cotaMensal: tierInfo.cotaMensal,
+        tier: tier.tier,
+        cotaMensal: tier.cotaMensal,
         tipoDispositivo: p.tipoDispositivo,
-        resolucaoTela: p.resolucaoTela,
-        ultimaAtividade: p.status === "ATIVO" ? new Date() : null,
+        resolucaoTela: p.tipoDispositivo ? "1920x1080" : null,
+        ultimaAtividade: p.status === "ATIVO" ? new Date(agora.getTime() - entre(5, 90) * 60 * 1000) : null,
+        criadoEm,
       },
     });
 
-    pontosSalvos[p.codigoTv] = ponto;
+    pontos[p.slug] = {
+      id: ponto.id,
+      userId: user.id,
+      nomeEmpresa: p.nomeEmpresa,
+      abertura: parseInt(p.horarioAbertura, 10),
+      fechamento: Math.min(parseInt(p.horarioFechamento, 10), 23),
+      fluxo: notaFluxo,
+    };
     console.log(
-      `[PONTO] ${ponto.nomeEmpresa} | TV: ${p.codigoTv} | ${tierInfo.tier} (R$ ${tierInfo.cotaMensal}/mês) | Login: ${p.email} (ponto123)`
+      `[PONTO] ${p.nomeEmpresa.padEnd(30)} TV ${p.codigoTv} | ${p.status.padEnd(8)} | ${tier.tier} (R$ ${tier.cotaMensal}/mês) | ${p.email}`
     );
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 3. ANUNCIANTES (MARCAS E EMPRESAS)
+  // 3. ANUNCIANTES
   // ─────────────────────────────────────────────────────────────
-  const anunciantesConfig = [
-    {
-      email: "suplementos@exemplo.com",
-      nomeUsuario: "Juliana Santos",
-      whatsapp: "(48) 99876-5432",
-      nomeEmpresa: "MegaNutri Suplementos",
-      categoria: "Saude e Bem-estar",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Centro",
-      rua: "Rua Bocaiúva",
-      numero: "500",
-      cep: "88015100",
-      oQueAnunciar: "Desconto de 20% em Whey Protein e Creatina",
-      descricaoAnuncio: "Promoção exclusiva para alunos e frequentadores dos estabelecimentos parceiros.",
-    },
-    {
-      email: "concessionaria@exemplo.com",
-      nomeUsuario: "Bruno Ferreira",
-      whatsapp: "(48) 99789-0123",
-      nomeEmpresa: "AutoPrime Veículos Premium",
-      categoria: "Automotivo",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Capoeiras",
-      rua: "Av. Governador Ivo Silveira",
-      numero: "1400",
-      cep: "88085000",
-      oQueAnunciar: "Novo SUV com taxa zero e primeira parcela para 2027",
-      descricaoAnuncio: "Condições imperdíveis para compra de veículos seminovos e zero km.",
-    },
-    {
-      email: "farmacia@exemplo.com",
-      nomeUsuario: "Patrícia Lima",
-      whatsapp: "(48) 99654-3210",
-      nomeEmpresa: "Drogaria Bem Estar",
-      categoria: "Farmacia / Saude",
-      cidade: "São José",
-      uf: "SC",
-      bairro: "Kobrasol",
-      rua: "Rua Koesa",
-      numero: "280",
-      cep: "88102310",
-      oQueAnunciar: "Entrega grátis e descontos em dermocosméticos",
-      descricaoAnuncio: "Farmácia de manipulação e drogaria com delivery rápido.",
-    },
-    {
-      email: "novamarca@exemplo.com",
-      nomeUsuario: "Thiago Mendes",
-      whatsapp: "(48) 99543-2109",
-      nomeEmpresa: "Studio Vida Ativa",
-      categoria: "Moda e Acessorios",
-      cidade: "Florianopolis",
-      uf: "SC",
-      bairro: "Trindade",
-      rua: "Rua Lauro Linhares",
-      numero: "700",
-      cep: "88036002",
-      oQueAnunciar: "Nova coleção fitness com tecnologia dry-fit",
-      descricaoAnuncio: "Roupas e acessórios esportivos de alta performance.",
-    },
-  ];
+  const anunciantes: Record<string, { id: number; userId: number; nomeEmpresa: string }> = {};
 
-  const anunciantesSalvos: Record<string, any> = {};
-
-  for (const a of anunciantesConfig) {
-    const user = await prisma.user.upsert({
-      where: { email: a.email },
-      update: {
-        nome: `${a.nomeUsuario} (${a.nomeEmpresa})`,
-        whatsapp: a.whatsapp,
-        ativo: true,
-        senha: defaultAnunciantePassword,
-      },
-      create: {
+  for (const [i, a] of ANUNCIANTES.entries()) {
+    const criadoEm = diasAtras(55 - i * 4);
+    const user = await prisma.user.create({
+      data: {
         email: a.email,
-        senha: defaultAnunciantePassword,
-        nome: `${a.nomeUsuario} (${a.nomeEmpresa})`,
+        senha: senhaAnunciante,
+        nome: a.responsavel,
         whatsapp: a.whatsapp,
+        avatarUrl: avatarUrl(a.avatar),
         role: "ANUNCIANTE",
-        ativo: true,
+        criadoEm,
       },
     });
 
-    const anunciante = await prisma.anunciante.upsert({
-      where: { userId: user.id },
-      update: {
-        nomeEmpresa: a.nomeEmpresa,
-        responsavel: a.nomeUsuario,
-        whatsapp: a.whatsapp,
-        cidade: a.cidade,
-        uf: a.uf,
-        bairro: a.bairro,
-        rua: a.rua,
-        numero: a.numero,
-        cep: a.cep,
-        categoria: a.categoria,
-        oQueAnunciar: a.oQueAnunciar,
-        descricaoAnuncio: a.descricaoAnuncio,
-      },
-      create: {
+    const anunciante = await prisma.anunciante.create({
+      data: {
         userId: user.id,
         nomeEmpresa: a.nomeEmpresa,
-        responsavel: a.nomeUsuario,
+        responsavel: a.responsavel,
         whatsapp: a.whatsapp,
-        cidade: a.cidade,
-        uf: a.uf,
-        bairro: a.bairro,
+        instagramSite: a.instagramSite,
+        logoUrl: logoUrl(a.slug),
+        fotos: a.fotos.map(fotoAnuncianteUrl),
+        cep: a.cep,
         rua: a.rua,
         numero: a.numero,
-        cep: a.cep,
+        bairro: a.bairro,
+        cidade: a.cidade,
+        uf: a.uf,
         categoria: a.categoria,
         oQueAnunciar: a.oQueAnunciar,
         descricaoAnuncio: a.descricaoAnuncio,
-        preferenciaLocalizacao: "Mesma cidade",
-        categoriasEspecificas: ["Academia / Crossfit", "Restaurante / Bar", "Clinica Medica / Odonto"],
-        faixaEtariaAlvo: ["18-25 anos", "26-35 anos", "36-45 anos"],
-        generoAlvo: "Misto (equilibrado)",
+        preferenciaLocalizacao: a.preferenciaLocalizacao,
+        categoriasEspecificas: a.categoriasEspecificas,
+        faixaEtariaAlvo: a.faixaEtariaAlvo,
+        generoAlvo: a.generoAlvo,
+        criadoEm,
       },
     });
 
-    anunciantesSalvos[a.email] = anunciante;
-    console.log(`[ANUNCIANTE] ${anunciante.nomeEmpresa} | Login: ${a.email} (anunciante123)`);
+    anunciantes[a.slug] = { id: anunciante.id, userId: user.id, nomeEmpresa: a.nomeEmpresa };
+    console.log(`[ANUNCIANTE] ${a.nomeEmpresa.padEnd(30)} | ${a.email}`);
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 4. ANÚNCIOS / CAMPANHAS (VÍDEOS E IMAGENS)
+  // 4. ANÚNCIOS + HISTÓRICO DE EXIBIÇÕES
   // ─────────────────────────────────────────────────────────────
-  const agora = new Date();
-  const trintaDias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const registros: { anuncioId: number; pontoMidiaId: number; duracaoSegundos: number; tipoMidia: "VIDEO" | "IMAGEM"; exibidoEm: Date }[] = [];
+  const contagem: Record<string, number> = {};
 
-  const anunciosConfig = [
-    // 1. MegaNutri na Academia Iron Fitness (Vídeo ATIVO)
-    {
-      anuncianteId: anunciantesSalvos["suplementos@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100001"].id,
-      titulo: "Whey Protein 100% Pure - 20% OFF",
-      descricao: "Apresente a foto desta tela no balcão da MegaNutri e ganhe desconto exclusivo.",
-      tipoMidia: "VIDEO" as const,
-      midiaUrl: "/uploads/videos/00b239f3-bee2-4118-b0fb-f4b8b81cd180.mp4",
-      duracaoSegundos: 15,
-      status: "ATIVO" as const,
-      dataInicio: agora,
-      dataFim: trintaDias,
-    },
-    // 2. MegaNutri na OdontoCenter (Imagem ATIVO)
-    {
-      anuncianteId: anunciantesSalvos["suplementos@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100003"].id,
-      titulo: "Colágeno Hidrolisado e Vitaminas",
-      descricao: "Cuide da sua saúde e bem-estar todos os dias com produtos MegaNutri.",
-      tipoMidia: "IMAGEM" as const,
-      midiaUrl: "/uploads/images/daf8e97a-0048-4773-b722-bb21bc2f5158.jpg",
-      duracaoSegundos: 10,
-      status: "ATIVO" as const,
-      dataInicio: agora,
-      dataFim: trintaDias,
-    },
-    // 3. AutoPrime no Restaurante Villa Gourmet (Vídeo ATIVO)
-    {
-      anuncianteId: anunciantesSalvos["concessionaria@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100002"].id,
-      titulo: "Festival de Seminovos AutoPrime",
-      descricao: "Taxa zero em até 36x e primeira parcela para o próximo ano. Agende um test drive!",
-      tipoMidia: "VIDEO" as const,
-      midiaUrl: "/uploads/videos/c6b20810-f5a6-41db-9557-99be5c071b4e.mp4",
-      duracaoSegundos: 15,
-      status: "ATIVO" as const,
-      dataInicio: agora,
-      dataFim: trintaDias,
-    },
-    // 4. AutoPrime na Barbearia Don Corleone (Imagem ATIVO)
-    {
-      anuncianteId: anunciantesSalvos["concessionaria@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100004"].id,
-      titulo: "Novo SUV Premium AutoPrime",
-      descricao: "Potência, elegância e tecnologia que combinam com o seu estilo.",
-      tipoMidia: "IMAGEM" as const,
-      midiaUrl: "/uploads/images/ba8a4a0f-be91-4eb1-9090-acee6b130c6d.jpg",
-      duracaoSegundos: 10,
-      status: "ATIVO" as const,
-      dataInicio: agora,
-      dataFim: trintaDias,
-    },
-    // 5. Drogaria Bem Estar na Academia (Vídeo PENDENTE de moderação para o Admin aprovar)
-    {
-      anuncianteId: anunciantesSalvos["farmacia@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100001"].id,
-      titulo: "Manipulação Esportiva e Drenagem",
-      descricao: "Fórmulas personalizadas para atletas e praticantes de musculação.",
-      tipoMidia: "VIDEO" as const,
-      midiaUrl: "/uploads/videos/6b5e7603-6dff-414c-a72d-b2cea2169986.mp4",
-      duracaoSegundos: 20,
-      status: "PENDENTE" as const,
-      dataInicio: null,
-      dataFim: null,
-    },
-    // 6. Drogaria Bem Estar no Restaurante (Imagem na FILA_ESPERA)
-    {
-      anuncianteId: anunciantesSalvos["farmacia@exemplo.com"].id,
-      pontoMidiaId: pontosSalvos["100002"].id,
-      titulo: "Vitaminas Imunidade e Protetor Solar",
-      descricao: "Linha completa de cuidados para você e sua família.",
-      tipoMidia: "IMAGEM" as const,
-      midiaUrl: "/uploads/images/8077e6ea-a004-4805-a1d1-1ce9b255ed72.jpg",
-      duracaoSegundos: 10,
-      status: "FILA_ESPERA" as const,
-      dataInicio: null,
-      dataFim: null,
-    },
-  ];
+  for (const ad of ANUNCIOS) {
+    const ponto = pontos[ad.ponto]!;
+    const anunciante = anunciantes[ad.anunciante]!;
+    const duracaoSegundos = ad.tipoMidia === "VIDEO" ? 15 : 10;
 
-  for (const an of anunciosConfig) {
-    const existe = await prisma.anuncio.findFirst({
-      where: {
-        anuncianteId: an.anuncianteId,
-        pontoMidiaId: an.pontoMidiaId,
-        titulo: an.titulo,
+    let dataInicio: Date | null = null;
+    let dataFim: Date | null = null;
+    let criadoEm = new Date(agora.getTime() - entre(2, 30) * 60 * 60 * 1000);
+
+    if (ad.diasNoAr) {
+      dataInicio = diasAtras(ad.diasNoAr, 8);
+      dataFim = new Date(dataInicio.getTime() + 30 * DIA);
+      criadoEm = new Date(dataInicio.getTime() - DIA);
+    }
+
+    const anuncio = await prisma.anuncio.create({
+      data: {
+        anuncianteId: anunciante.id,
+        pontoMidiaId: ponto.id,
+        titulo: ad.titulo,
+        descricao: ad.descricao,
+        tipoMidia: ad.tipoMidia,
+        midiaUrl: midiaAnuncioUrl(ad.slug, ad.tipoMidia),
+        duracaoSegundos,
+        status: ad.status,
+        motivoRejeicao: ad.motivoRejeicao ?? null,
+        dataInicio,
+        dataFim,
+        criadoEm,
       },
     });
+    contagem[ad.status] = (contagem[ad.status] ?? 0) + 1;
 
-    if (existe) {
-      await prisma.anuncio.update({
-        where: { id: existe.id },
-        data: {
-          status: an.status,
-          tipoMidia: an.tipoMidia,
-          midiaUrl: an.midiaUrl,
-          duracaoSegundos: an.duracaoSegundos,
-          dataInicio: an.dataInicio,
-          dataFim: an.dataFim,
-        },
-      });
-      console.log(`[ANÚNCIO ATUALIZADO] "${an.titulo}" -> Status: ${an.status}`);
-    } else {
-      await prisma.anuncio.create({
-        data: {
-          anuncianteId: an.anuncianteId,
-          pontoMidiaId: an.pontoMidiaId,
-          titulo: an.titulo,
-          descricao: an.descricao,
-          tipoMidia: an.tipoMidia,
-          midiaUrl: an.midiaUrl,
-          duracaoSegundos: an.duracaoSegundos,
-          status: an.status,
-          dataInicio: an.dataInicio,
-          dataFim: an.dataFim,
-        },
-      });
-      console.log(`[ANÚNCIO CRIADO] "${an.titulo}" -> Status: ${an.status}`);
+    // Exibições: campanhas que já foram ao ar (ativas, pausadas ou expiradas)
+    if (ad.diasNoAr && dataInicio) {
+      const ultimoDia = ad.status === "EXPIRADO" ? ad.diasNoAr - 30 : ad.status === "PAUSADO" ? 3 : 0;
+      for (let d = ad.diasNoAr; d >= Math.max(ultimoDia, 0); d--) {
+        const exibicoesNoDia = Math.round(entre(18, 34) * (ponto.fluxo / 4));
+        for (let n = 0; n < exibicoesNoDia; n++) {
+          const exibidoEm = diasAtras(d, entre(ponto.abertura, ponto.fechamento - 1));
+          exibidoEm.setMinutes(entre(0, 59), entre(0, 59));
+          if (exibidoEm > agora) continue;
+          registros.push({ anuncioId: anuncio.id, pontoMidiaId: ponto.id, duracaoSegundos, tipoMidia: ad.tipoMidia, exibidoEm });
+        }
+      }
     }
   }
 
+  for (let i = 0; i < registros.length; i += 2000) {
+    await prisma.registroExibicao.createMany({ data: registros.slice(i, i + 2000) });
+  }
+  console.log(`\n[ANÚNCIOS] ${ANUNCIOS.length} criados →`, contagem);
+  console.log(`[EXIBIÇÕES] ${registros.length} registros de exibição gerados`);
+
   // ─────────────────────────────────────────────────────────────
-  // 5. NOTIFICAÇÕES DE DEMONSTRAÇÃO
+  // 5. NOTIFICAÇÕES
   // ─────────────────────────────────────────────────────────────
-  const notificacoes = [
-    {
+  type Notif = { userId: number; tipo: TipoNotificacao; titulo: string; mensagem: string; lida?: boolean; horasAtras: number };
+  const notificacoes: Notif[] = [];
+
+  // Admin
+  for (const ad of ANUNCIOS.filter((a) => a.status === "PENDENTE")) {
+    notificacoes.push({
       userId: admin.id,
-      tipo: "ANUNCIO_PENDENTE" as const,
-      titulo: "Novo Anúncio Aguardando Moderação",
-      mensagem: "A empresa 'Drogaria Bem Estar' enviou a campanha 'Manipulação Esportiva' para aprovação.",
-    },
-    {
-      userId: anunciantesSalvos["suplementos@exemplo.com"].userId,
-      tipo: "ANUNCIO_APROVADO" as const,
-      titulo: "Campanha Aprovada com Sucesso!",
-      mensagem: "Seu anúncio 'Whey Protein 100% Pure' foi aprovado e já está sendo veiculado na Academia Iron Fitness.",
-    },
-    {
-      userId: pontosSalvos["100001"].userId,
-      tipo: "NOVO_ANUNCIO_TV" as const,
-      titulo: "Novo Anunciante na sua TV",
-      mensagem: "O anunciante 'MegaNutri Suplementos' começou a veicular hoje na sua tela.",
-    },
-  ];
-
-  for (const notif of notificacoes) {
-    const jaExiste = await prisma.notificacao.findFirst({
-      where: {
-        userId: notif.userId,
-        titulo: notif.titulo,
-      },
+      tipo: "ANUNCIO_PENDENTE",
+      titulo: "Novo anúncio aguardando moderação",
+      mensagem: `"${ad.titulo}" de ${anunciantes[ad.anunciante]!.nomeEmpresa} para ${pontos[ad.ponto]!.nomeEmpresa}.`,
+      horasAtras: entre(1, 20),
     });
+  }
+  for (const p of PONTOS.filter((p) => p.status === "PENDENTE")) {
+    notificacoes.push({
+      userId: admin.id,
+      tipo: "ALERTA",
+      titulo: "Novo estabelecimento cadastrado",
+      mensagem: `${p.nomeEmpresa} (${p.bairro}, ${p.cidade}) aguarda aprovação para entrar na rede.`,
+      horasAtras: entre(2, 30),
+    });
+  }
+  notificacoes.push(
+    { userId: admin.id, tipo: "FILA_ESPERA", titulo: "Anúncios na fila de espera", mensagem: "2 campanhas aguardam liberação de cota em Villa Gourmet e Iron Fitness.", horasAtras: 26, lida: true },
+    { userId: admin.id, tipo: "PONTO_DESATIVADO", titulo: "Ponto desativado", mensagem: "Lava-Jato Brilho Total foi desativado temporariamente (TV em manutenção).", horasAtras: 72, lida: true },
+    { userId: admin.id, tipo: "COBRANCA", titulo: "Pagamento recebido", mensagem: "AutoPrime Veículos pagou R$ 249,00 via PIX — campanha \"Festival de Seminovos\".", horasAtras: 290, lida: true }
+  );
 
-    if (!jaExiste) {
-      await prisma.notificacao.create({
-        data: notif,
-      });
+  // Anunciantes
+  for (const ad of ANUNCIOS) {
+    const userId = anunciantes[ad.anunciante]!.userId;
+    const ponto = pontos[ad.ponto]!.nomeEmpresa;
+    if (ad.status === "ATIVO") {
+      notificacoes.push({ userId, tipo: "ANUNCIO_APROVADO", titulo: "Campanha no ar!", mensagem: `"${ad.titulo}" foi aprovada e está sendo exibida em ${ponto}.`, horasAtras: (ad.diasNoAr ?? 1) * 24, lida: (ad.diasNoAr ?? 0) > 5 });
+    } else if (ad.status === "REJEITADO") {
+      notificacoes.push({ userId, tipo: "ANUNCIO_REJEITADO", titulo: "Anúncio não aprovado", mensagem: `"${ad.titulo}" para ${ponto}: ${ad.motivoRejeicao}`, horasAtras: 30 });
+    } else if (ad.status === "FILA_ESPERA") {
+      notificacoes.push({ userId, tipo: "FILA_ESPERA", titulo: "Anúncio na fila de espera", mensagem: `${ponto} está com as cotas ocupadas. "${ad.titulo}" entra no ar assim que abrir uma vaga.`, horasAtras: 26 });
+    } else if (ad.status === "APROVADO") {
+      notificacoes.push({ userId, tipo: "COBRANCA", titulo: "Anúncio aprovado — pague para ativar", mensagem: `"${ad.titulo}" foi aprovado para ${ponto}. Gere o PIX no painel para colocar no ar.`, horasAtras: 5 });
+    } else if (ad.status === "EXPIRADO") {
+      notificacoes.push({ userId, tipo: "GERAL", titulo: "Campanha encerrada", mensagem: `"${ad.titulo}" em ${ponto} completou 30 dias e foi encerrada. Que tal renovar?`, horasAtras: 240, lida: true });
+    } else if (ad.status === "PENDENTE") {
+      notificacoes.push({ userId, tipo: "SISTEMA", titulo: "Anúncio enviado para análise", mensagem: `"${ad.titulo}" foi recebido e será analisado em até 24h.`, horasAtras: entre(1, 20), lida: true });
     }
   }
+
+  // Pontos
+  for (const ad of ANUNCIOS.filter((a) => a.status === "ATIVO")) {
+    notificacoes.push({
+      userId: pontos[ad.ponto]!.userId,
+      tipo: "NOVO_ANUNCIO_TV",
+      titulo: "Novo anúncio na sua TV",
+      mensagem: `${anunciantes[ad.anunciante]!.nomeEmpresa} começou a veicular "${ad.titulo}" na sua tela.`,
+      horasAtras: (ad.diasNoAr ?? 1) * 24,
+      lida: (ad.diasNoAr ?? 0) > 5,
+    });
+  }
+  for (const p of PONTOS) {
+    const userId = pontos[p.slug]!.userId;
+    if (p.status === "ATIVO") {
+      notificacoes.push({ userId, tipo: "PONTO_ATIVADO", titulo: "Seu ponto foi aprovado!", mensagem: `${p.nomeEmpresa} agora faz parte da rede Media+. Pareie sua TV com o código ${p.codigoTv}.`, horasAtras: 24 * 25, lida: true });
+    } else if (p.status === "PENDENTE") {
+      notificacoes.push({ userId, tipo: "SISTEMA", titulo: "Cadastro em análise", mensagem: "Recebemos seu cadastro! Nossa equipe vai validar as informações em até 48h.", horasAtras: 20 });
+    } else {
+      notificacoes.push({ userId, tipo: "PONTO_DESATIVADO", titulo: "Ponto desativado", mensagem: "Seu ponto foi desativado temporariamente. Fale com o suporte para reativar.", horasAtras: 72 });
+    }
+  }
+
+  await prisma.notificacao.createMany({
+    data: notificacoes.map(({ horasAtras, lida, ...n }) => ({
+      ...n,
+      lida: lida ?? false,
+      criadoEm: new Date(agora.getTime() - horasAtras * 60 * 60 * 1000),
+    })),
+  });
+  console.log(`[NOTIFICAÇÕES] ${notificacoes.length} criadas`);
 
   console.log("\n=========================================");
-  console.log("  Seed Concluído com Sucesso!            ");
+  console.log("  Seed concluído! Acessos em ACESSOS.md  ");
   console.log("=========================================");
 }
 

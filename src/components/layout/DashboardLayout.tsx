@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sidebar } from "./Sidebar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -29,6 +29,24 @@ export function DashboardLayout({
   actions,
   children,
 }: DashboardLayoutProps) {
+  // Páginas que não informam a foto (undefined) buscam a do usuário logado,
+  // para o avatar aparecer de forma consistente em todo o painel.
+  const [avatarBuscado, setAvatarBuscado] = useState<string | null>(null);
+  useEffect(() => {
+    if (userAvatar !== undefined) return;
+    let ativo = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (ativo && data?.user?.avatarUrl) setAvatarBuscado(data.user.avatarUrl);
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, [userAvatar]);
+  const avatar = userAvatar ?? avatarBuscado;
+
   const perfilHref =
     role === "PONTO"
       ? "/ponto/perfil"
@@ -44,20 +62,20 @@ export function DashboardLayout({
           role={role}
           userName={userName}
           userEmail={userEmail}
-          userAvatar={userAvatar}
+          userAvatar={avatar}
           pontoId={pontoId}
         />
 
         {/* Main Content Area */}
         <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
           {/* Desktop Top Navbar */}
-          <header className="hidden lg:flex h-16 bg-white border-b border-[#E4E7EC] px-8 items-center justify-between sticky top-0 z-20 shadow-2xs">
+          <header className="hidden lg:flex h-[72px] bg-[#F7F8FA]/80 backdrop-blur-lg border-b border-[#E4E7EC]/70 px-8 items-center justify-between sticky top-0 z-20">
             <div>
               {title && (
-                <h1 className="text-lg font-black text-[#0E1F66] font-heading">{title}</h1>
+                <h1 className="text-[19px] font-semibold text-[#0E1F66] font-heading leading-tight">{title}</h1>
               )}
               {description && (
-                <p className="text-xs text-[#9AA3AF]">{description}</p>
+                <p className="text-[13px] text-[#8A93A3] mt-0.5">{description}</p>
               )}
             </div>
             <div className="flex items-center gap-3.5">
@@ -68,14 +86,14 @@ export function DashboardLayout({
               {/* Foto de Perfil e Acesso do Usuário */}
               <Link
                 href={perfilHref}
-                className="flex items-center gap-2.5 pl-2 border-l border-[#E4E7EC] hover:opacity-85 transition group cursor-pointer"
+                className="flex items-center gap-2.5 pl-4 ml-1 border-l border-[#E4E7EC] transition group cursor-pointer"
                 title="Acessar edições de usuário e perfil"
               >
-                {userAvatar ? (
-                  <img
-                    src={userAvatar}
+                {avatar ? (
+                  <img loading="lazy" decoding="async"
+                    src={avatar}
                     alt={userName}
-                    className="w-8 h-8 rounded-full object-cover border border-[#E4E7EC] shadow-2xs group-hover:border-[#4F93C9] transition"
+                    className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm group-hover:ring-[#4F93C9]/30 transition"
                   />
                 ) : (
                   <div
@@ -88,10 +106,10 @@ export function DashboardLayout({
                   </div>
                 )}
                 <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-[#344054] max-w-[120px] truncate group-hover:text-[#4F93C9] transition">
+                  <span className="text-[13px] font-medium text-[#344054] max-w-[140px] truncate group-hover:text-[#0E1F66] transition">
                     {userName}
                   </span>
-                  {!userAvatar && (
+                  {!avatar && (
                     <span className="text-[10px] text-[#4F93C9] font-semibold leading-none">
                       + Foto
                     </span>
@@ -102,13 +120,13 @@ export function DashboardLayout({
           </header>
 
           {/* Page Content */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 mt-16 lg:mt-0 max-w-7xl w-full mx-auto">
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8 mt-14 lg:mt-0 max-w-[1320px] w-full mx-auto animate-fade-in">
             {/* Mobile title if any */}
             {title && (
               <div className="lg:hidden mb-6">
-                <h1 className="text-xl font-black text-[#0E1F66] font-heading">{title}</h1>
+                <h1 className="text-xl font-semibold text-[#0E1F66] font-heading">{title}</h1>
                 {description && (
-                  <p className="text-xs text-[#9AA3AF] mt-0.5">{description}</p>
+                  <p className="text-[13px] text-[#8A93A3] mt-0.5">{description}</p>
                 )}
                 {actions && <div className="mt-3">{actions}</div>}
               </div>

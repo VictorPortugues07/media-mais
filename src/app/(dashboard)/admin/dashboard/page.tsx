@@ -681,14 +681,14 @@ export default function AdminDashboardPage() {
             {previewAd.midiaUrl ? (
               <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center relative">
                 {previewAd.tipoMidia === "VIDEO" ? (
-                  <video
+                  <video preload="metadata"
                     src={previewAd.midiaUrl}
                     controls
                     autoPlay
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={previewAd.midiaUrl}
                     alt={previewAd.titulo}
                     className="w-full h-full object-contain"
@@ -765,9 +765,9 @@ export default function AdminDashboardPage() {
               {adToDelete.midiaUrl ? (
                 <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
                   {adToDelete.tipoMidia === "VIDEO" ? (
-                    <video src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
+                    <video preload="metadata" src={adToDelete.midiaUrl} muted className="w-full h-full object-cover" />
                   ) : (
-                    <img src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
+                    <img loading="lazy" decoding="async" src={adToDelete.midiaUrl} alt={adToDelete.titulo} className="w-full h-full object-cover" />
                   )}
                 </div>
               ) : null}

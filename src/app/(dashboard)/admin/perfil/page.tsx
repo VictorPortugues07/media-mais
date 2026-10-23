@@ -65,6 +65,7 @@ export default function AdminPerfilPage() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("variante", "avatar");
 
     try {
       const res = await fetch("/api/upload", {
@@ -193,7 +194,7 @@ export default function AdminPerfilPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
                   <div className="relative">
                     {form.avatarUrl ? (
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={form.avatarUrl}
                         alt="Foto de Perfil"
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"

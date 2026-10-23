@@ -1,14 +1,26 @@
 ﻿"use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
+import { PagamentoPixModal } from "@/components/pagamento/PagamentoPixModal";
+import { cn } from "@/lib/utils";
+import {
+  Icon,
+  StatTile,
+  Painel,
+  SecaoTitulo,
+  HeroNavy,
+  MiniTv,
+  Toast,
+  PainelCarregando,
+  Saudacao,
+  primeiroNome,
+  moeda,
+} from "@/components/dashboard/ui";
 
 interface UserData {
   id: number;
@@ -19,13 +31,15 @@ interface UserData {
   anunciante?: { id: number; nomeEmpresa: string; logoUrl?: string | null };
 }
 
+type StatusAnuncio = "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO" | "FILA_ESPERA" | "EXPIRADO";
+
 interface AnuncioItem {
   id: number;
   titulo: string;
   tipoMidia: "VIDEO" | "IMAGEM";
   midiaUrl: string;
   duracaoSegundos: number;
-  status: "PENDENTE" | "APROVADO" | "REJEITADO" | "ATIVO" | "PAUSADO" | "FILA_ESPERA";
+  status: StatusAnuncio;
   posicaoFila?: number | null;
   motivoRejeicao?: string;
   criadoEm: string;
@@ -40,44 +54,6 @@ interface AnuncioItem {
     uf: string;
     tvOnline?: boolean;
   };
-}
-
-function StatusPill({
-  status,
-  tvOnline,
-  posicaoFila,
-}: {
-  status: string;
-  tvOnline?: boolean;
-  posicaoFila?: number | null;
-}) {
-  if (status === "ATIVO" && tvOnline) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#D8E8E1] text-[#1E4333] border border-[#8FAE9E]/50">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E] animate-pulse" />
-        Ao Vivo
-      </span>
-    );
-  }
-  if (status === "ATIVO") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-        Ativo
-      </span>
-    );
-  }
-  if (status === "FILA_ESPERA") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#B45309] animate-pulse" />
-        Fila de Espera {posicaoFila ? `#${posicaoFila}` : ""}
-      </span>
-    );
-  }
-  if (status === "PENDENTE") return <Badge variant="info">Moderação</Badge>;
-  if (status === "REJEITADO") return <Badge variant="danger">Rejeitado</Badge>;
-  return <Badge>{status}</Badge>;
 }
 
 interface AnuncianteStats {
@@ -95,11 +71,60 @@ interface AnuncianteStats {
   };
 }
 
+const STATUS_VISUAL: Record<StatusAnuncio, { rotulo: string; cor: string; fundo: string; pulsa?: boolean }> = {
+  ATIVO: { rotulo: "No ar", cor: "#3E6B57", fundo: "bg-[#D8E8E1]" },
+  APROVADO: { rotulo: "Aguardando pagamento", cor: "#047857", fundo: "bg-emerald-50", pulsa: true },
+  PENDENTE: { rotulo: "Em análise", cor: "#2F6FA3", fundo: "bg-[#4F93C9]/10" },
+  FILA_ESPERA: { rotulo: "Fila de espera", cor: "#B45309", fundo: "bg-amber-50" },
+  REJEITADO: { rotulo: "Não aprovado", cor: "#BE123C", fundo: "bg-rose-50" },
+  PAUSADO: { rotulo: "Pausado", cor: "#475467", fundo: "bg-[#F4F5F7]" },
+  EXPIRADO: { rotulo: "Encerrado", cor: "#667085", fundo: "bg-[#F4F5F7]" },
+};
+
+function StatusPill({ status, tvOnline, posicaoFila }: { status: StatusAnuncio; tvOnline?: boolean; posicaoFila?: number | null }) {
+  const v = STATUS_VISUAL[status] ?? STATUS_VISUAL.PAUSADO;
+  const aoVivo = status === "ATIVO" && tvOnline;
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium leading-none backdrop-blur-sm", v.fundo)}
+      style={{ color: v.cor }}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", (aoVivo || v.pulsa) && "animate-pulse")} style={{ background: v.cor }} />
+      {aoVivo ? "Ao vivo agora" : v.rotulo}
+      {status === "FILA_ESPERA" && posicaoFila ? ` · #${posicaoFila}` : ""}
+    </span>
+  );
+}
+
+const FILTROS = [
+  { id: "todas", rotulo: "Todas", inclui: () => true },
+  { id: "no-ar", rotulo: "No ar", inclui: (s: StatusAnuncio) => s === "ATIVO" },
+  { id: "andamento", rotulo: "Em andamento", inclui: (s: StatusAnuncio) => ["PENDENTE", "APROVADO", "FILA_ESPERA"].includes(s) },
+  { id: "encerradas", rotulo: "Encerradas", inclui: (s: StatusAnuncio) => ["REJEITADO", "PAUSADO", "EXPIRADO"].includes(s) },
+] as const;
+
+type FiltroId = (typeof FILTROS)[number]["id"];
+
+const TIER_CLASSE: Record<string, string> = {
+  Ouro: "bg-[#FEF3C7]/80 text-[#92400E]",
+  Prata: "bg-[#F1F5F9] text-[#334155]",
+  Bronze: "bg-[#FFEDD5]/80 text-[#9A3412]",
+};
+
+function Midia({ anuncio, className }: { anuncio: AnuncioItem; className?: string }) {
+  return anuncio.tipoMidia === "VIDEO" ? (
+    <video preload="metadata" src={anuncio.midiaUrl} muted className={className} />
+  ) : (
+    <img loading="lazy" decoding="async" src={anuncio.midiaUrl} alt={anuncio.titulo} className={className} />
+  );
+}
+
 export default function AnuncianteDashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [anuncios, setAnuncios] = useState<AnuncioItem[]>([]);
   const [stats, setStats] = useState<AnuncianteStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState<FiltroId>("todas");
   const [previewAd, setPreviewAd] = useState<AnuncioItem | null>(null);
   const [removalModalOpen, setRemovalModalOpen] = useState(false);
   const [adToRequestRemoval, setAdToRequestRemoval] = useState<AnuncioItem | null>(null);
@@ -107,6 +132,7 @@ export default function AnuncianteDashboard() {
   const [requestingRemoval, setRequestingRemoval] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [pagandoId, setPagandoId] = useState<number | null>(null);
 
   const handleOpenRemovalModal = (ad: AnuncioItem) => {
     setAdToRequestRemoval(ad);
@@ -133,11 +159,10 @@ export default function AnuncianteDashboard() {
       setAdToRequestRemoval(null);
       setMotivoRemocao("");
       setPreviewAd(null);
-      setToastMessage("Solicitação de remoção enviada com sucesso para a moderação!");
+      setToastMessage("Solicitação de remoção enviada para a moderação.");
       setTimeout(() => setToastMessage(null), 4500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao enviar solicitação";
-      setRequestError(msg);
+      setRequestError(err instanceof Error ? err.message : "Erro ao enviar solicitação");
     } finally {
       setRequestingRemoval(false);
     }
@@ -163,19 +188,15 @@ export default function AnuncianteDashboard() {
     loadData();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  const ativos = anuncios.filter((a) => a.status === "ATIVO");
-  const pendentes = anuncios.filter((a) => a.status === "PENDENTE");
-  const naFila = anuncios.filter((a) => a.status === "FILA_ESPERA");
-  const rejeitados = anuncios.filter((a) => a.status === "REJEITADO");
-  const totalExibicoes = anuncios.reduce((sum, a) => sum + (a.totalExibicoes ?? 0), 0);
+  const ativos = useMemo(() => anuncios.filter((a) => a.status === "ATIVO"), [anuncios]);
+  const aguardandoPagamento = anuncios.filter((a) => a.status === "APROVADO");
+  const emAndamento = anuncios.filter((a) => ["PENDENTE", "FILA_ESPERA"].includes(a.status));
+  const exibicoesHoje = anuncios.reduce((s, a) => s + (a.exibicoesHoje ?? 0), 0);
+  const totalExibicoes = anuncios.reduce((s, a) => s + (a.totalExibicoes ?? 0), 0);
+  const investimento = stats?.financeiro?.gastoMensalTotal ?? 0;
+  const filtroAtual = FILTROS.find((f) => f.id === filtro)!;
+  const visiveis = anuncios.filter((a) => filtroAtual.inclui(a.status));
+  const telas = new Set(ativos.map((a) => a.pontoMidia.id)).size;
 
   return (
     <DashboardLayout
@@ -183,415 +204,339 @@ export default function AnuncianteDashboard() {
       userName={user?.nome || "Anunciante"}
       userEmail={user?.email || ""}
       userAvatar={user?.avatarUrl || null}
-      title="Painel do Anunciante"
-      description="Acompanhe suas campanhas e métricas de veiculação"
+      title="Visão geral"
+      description={user?.anunciante?.nomeEmpresa}
       actions={
         <Link href="/anunciante/anuncios/novo">
-          <Button size="sm" variant="gradient">
-            <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Nova Campanha
+          <Button size="sm" variant="navy">
+            <Icon name="plus" className="h-4 w-4" strokeWidth={2} />
+            Nova campanha
           </Button>
         </Link>
       }
     >
-      <div className="space-y-6">
-
-        {/* ── KPIs ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: "Ativos", value: ativos.length, sub: "veiculando nas TVs",
-              icon: (
-                <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              ),
-              color: "text-[#0E1F66]", bg: "bg-[#4F93C9]/10", ring: "ring-[#4F93C9]/20",
-            },
-            {
-              label: "Fila de Espera", value: naFila.length, sub: "aguardando vagas",
-              icon: (
-                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              ),
-              color: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-100",
-            },
-            {
-              label: "Em Moderação", value: pendentes.length, sub: "em análise pela equipe",
-              icon: (
-                <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              ),
-              color: "text-[#0E1F66]", bg: "bg-slate-100", ring: "ring-slate-200",
-            },
-            {
-              label: "Total Exibições", value: totalExibicoes.toLocaleString("pt-BR"), sub: "reproduções acumuladas",
-              icon: (
-                <svg className="w-5 h-5 text-[#8FAE9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              ),
-              color: "text-[#0E1F66]", bg: "bg-[#D8E8E1]", ring: "ring-[#8FAE9E]/30",
-            },
-          ].map((kpi) => (
-            <Card key={kpi.label}>
-              <CardBody>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">{kpi.label}</p>
-                    <p className={`text-3xl font-black font-heading mt-1.5 ${kpi.color}`}>{kpi.value}</p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5 leading-tight">{kpi.sub}</p>
-                  </div>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpi.bg} ring-1 ${kpi.ring}`}>
-                    {kpi.icon}
-                  </div>
+      {loading ? (
+        <PainelCarregando />
+      ) : (
+        <div className="space-y-8">
+          {/* ── Destaque ─────────────────────────────────────── */}
+          <HeroNavy>
+            <div className="grid items-center gap-8 p-7 sm:p-9 lg:grid-cols-[1.25fr_1fr]">
+              <div>
+                <p className="text-sm text-white/60">
+                  <Saudacao />, {primeiroNome(user?.nome)}
+                </p>
+                <h2 className="mt-2 font-heading text-[28px] sm:text-[34px] font-semibold leading-[1.12] tracking-tight">
+                  {ativos.length > 0 ? (
+                    <>
+                      Sua marca está no ar em{" "}
+                      <span className="text-[#8EC3EA]">{telas === 1 ? "1 tela" : `${telas} telas`}</span>.
+                    </>
+                  ) : (
+                    "Vamos colocar sua marca no ar?"
+                  )}
+                </h2>
+                <p className="mt-3 max-w-md text-[15px] leading-relaxed text-white/65">
+                  {ativos.length > 0
+                    ? `Hoje seus anúncios já foram exibidos ${exibicoesHoje.toLocaleString("pt-BR")} vezes. Acompanhe cada campanha abaixo.`
+                    : "Escolha uma tela no mapa, envie seu anúncio e acompanhe cada exibição por aqui."}
+                </p>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <Link
+                    href="/anunciante/anuncios/novo"
+                    className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-[#0E1F66] shadow-md transition hover:bg-[#EEF4FB]"
+                  >
+                    <Icon name="plus" className="h-4 w-4" strokeWidth={2} />
+                    Nova campanha
+                  </Link>
+                  <Link
+                    href="/anunciante/mapa"
+                    className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-white ring-1 ring-white/25 transition hover:bg-white/10"
+                  >
+                    <Icon name="map" className="h-4 w-4" />
+                    Explorar telas
+                  </Link>
                 </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
-
-        {/* ── Resumo Financeiro & Faturamento ─────────────────────────── */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-[#0E1F66] font-heading">
-                Resumo do Faturamento & Investimento
-              </h3>
-              <p className="text-xs text-[#9AA3AF]">
-                Valor mensal correspondente às cotas das suas campanhas ativas
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-[#344054] bg-[#F7F8FA] border border-[#E4E7EC] px-2.5 py-1 rounded-lg">
-              Pagamento online via API em breve
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="border-l-4 border-l-[#4F93C9]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Investimento Mensal
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
-                      {(stats?.financeiro?.gastoMensalTotal ?? 0).toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      total de cotas ativas no ar
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#4F93C9]/10 text-[#4F93C9] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card className="border-l-4 border-l-[#8FAE9E]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Cotas em Transmissão
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#1E4333] mt-1">
-                      {ativos.length}
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      {ativos.length === 1 ? "1 TV veiculando" : `${ativos.length} TVs veiculando`}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#D8E8E1] text-[#1E4333] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card className="border-l-4 border-l-[#0E1F66]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Modelo de Cobrança
-                    </p>
-                    <p className="text-base font-bold text-[#0E1F66] mt-1.5 font-heading">
-                      Cota Fixa Mensal
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      Sem taxa de adesão ou fidelidade
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#0E1F66]/10 text-[#0E1F66] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-
-          {/* Detalhamento por Campanha Ativa */}
-          {stats?.financeiro?.detalhamentoCampanhas && stats.financeiro.detalhamentoCampanhas.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E4E7EC] p-4 space-y-2">
-              <p className="text-xs font-bold text-[#344054]">Detalhamento das cotas ativas:</p>
-              <div className="divide-y divide-[#E4E7EC]">
-                {stats.financeiro.detalhamentoCampanhas.map((item) => (
-                  <div key={item.anuncioId} className="py-2 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-[#0E1F66] truncate">{item.titulo}</span>
-                      <span className="text-[#9AA3AF]">em</span>
-                      <span className="text-[#344054] truncate">
-                        {item.pontoNome} ({item.cidade})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
-                          item.tier === "Ouro"
-                            ? "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
-                            : item.tier === "Prata"
-                            ? "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]"
-                            : "bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74]"
-                        }`}
-                      >
-                        {item.tier}
-                      </span>
-                      <span className="font-bold text-[#1E4333]">
-                        {item.cotaMensal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês
-                      </span>
-                    </div>
-                  </div>
-                ))}
               </div>
+
+              <MiniTv
+                legenda="Exibindo em"
+                itens={ativos.map((a) => ({
+                  midiaUrl: a.midiaUrl,
+                  tipoMidia: a.tipoMidia,
+                  titulo: a.titulo,
+                  local: `${a.pontoMidia.nomeEmpresa} · ${a.pontoMidia.cidade}`,
+                }))}
+              />
+            </div>
+          </HeroNavy>
+
+          {/* ── Ação pendente ─────────────────────────────────── */}
+          {aguardandoPagamento.length > 0 && (
+            <div className="flex flex-col gap-4 rounded-2xl bg-emerald-50/70 p-5 ring-1 ring-emerald-200/70 sm:flex-row sm:items-center animate-fade-in">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                <Icon name="check" className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-emerald-900">
+                  {aguardandoPagamento.length === 1
+                    ? `"${aguardandoPagamento[0]!.titulo}" foi aprovada!`
+                    : `${aguardandoPagamento.length} campanhas foram aprovadas!`}
+                </p>
+                <p className="text-[13px] text-emerald-800/70">Faça o pagamento via PIX para colocar no ar.</p>
+              </div>
+              <Button variant="success" size="sm" onClick={() => setPagandoId(aguardandoPagamento[0]!.id)}>
+                Pagar e ativar
+                <Icon name="arrow" className="h-4 w-4" />
+              </Button>
             </div>
           )}
-        </div>
 
-        {/* ── Campanhas ────────────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-[#0E1F66] font-heading">Minhas Campanhas</h3>
-                <p className="text-xs text-[#9AA3AF] mt-0.5">Status de veiculação em cada ponto de TV</p>
-              </div>
-              <Link href="/anunciante/mapa">
-                <Button variant="secondary" size="sm">Explorar Pontos</Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardBody className="p-0">
-            {anuncios.length === 0 ? (
-              <div className="p-8">
+          {/* ── Números ──────────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatTile icon="play" tom="sky" label="Exibições hoje" valor={exibicoesHoje} dica="em todas as telas" delay={0} />
+            <StatTile icon="chart" tom="teal" label="Exibições no total" valor={totalExibicoes} dica="desde o início" delay={70} />
+            <StatTile icon="tv" tom="navy" label="Campanhas no ar" valor={ativos.length} dica={emAndamento.length ? `${emAndamento.length} em andamento` : "nenhuma pendente"} delay={140} />
+            <StatTile icon="wallet" tom="amber" label="Investimento mensal" valor={investimento} formatar={moeda} dica="cota fixa, sem fidelidade" delay={210} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+            {/* ── Campanhas ─────────────────────────────────── */}
+            <div className="space-y-5">
+              <SecaoTitulo
+                titulo="Suas campanhas"
+                descricao="Clique em uma campanha para ver a peça e os detalhes."
+                acao={
+                  <div className="inline-flex rounded-full bg-[#0E1F66]/[0.05] p-1">
+                    {FILTROS.map((f) => {
+                      const qtd = anuncios.filter((a) => f.inclui(a.status)).length;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setFiltro(f.id)}
+                          className={cn(
+                            "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition cursor-pointer",
+                            filtro === f.id ? "bg-white text-[#0E1F66] shadow-sm" : "text-[#667085] hover:text-[#0E1F66]"
+                          )}
+                        >
+                          {f.rotulo}
+                          <span className="ml-1.5 text-[11px] text-[#AEB6C4]">{qtd}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                }
+              />
+
+              {anuncios.length === 0 ? (
                 <EmptyState
-                  title="Nenhuma campanha criada"
-                  description="Explore os pontos disponíveis no mapa e escolha onde exibir seu anúncio."
+                  icon={<Icon name="tv" className="h-7 w-7" />}
+                  title="Nenhuma campanha ainda"
+                  description="Explore as telas disponíveis no mapa e escolha onde exibir seu primeiro anúncio."
                   action={
                     <Link href="/anunciante/mapa">
-                      <Button variant="gradient">Ver Mapa de Pontos</Button>
+                      <Button variant="navy">Ver mapa de telas</Button>
                     </Link>
                   }
                 />
-              </div>
-            ) : (
-              <div className="divide-y divide-[#E4E7EC]">
-                {anuncios.map((anuncio) => (
-                  <div
-                    key={anuncio.id}
-                    className="px-5 py-4 flex items-center gap-4 hover:bg-[#F7F8FA] transition"
-                  >
-                    {/* Thumbnail clicável para preview */}
-                    <button
-                      type="button"
-                      onClick={() => setPreviewAd(anuncio)}
-                      title="Clique para visualizar mídia"
-                      className="w-16 h-11 bg-[#0E1F66] rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
-                    >
-                      {anuncio.tipoMidia === "VIDEO" ? (
-                        <video src={anuncio.midiaUrl} muted className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={anuncio.midiaUrl} alt={anuncio.titulo} className="w-full h-full object-cover" />
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </div>
-                    </button>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewAd(anuncio)}
-                          className="font-semibold text-[#0E1F66] text-sm truncate hover:text-[#4F93C9] transition text-left cursor-pointer"
-                        >
-                          {anuncio.titulo}
-                        </button>
-                        <StatusPill
-                          status={anuncio.status}
-                          tvOnline={anuncio.pontoMidia.tvOnline}
-                          posicaoFila={anuncio.posicaoFila}
-                        />
-                      </div>
-                      <p className="text-xs text-[#9AA3AF] mt-0.5 truncate">
-                        {anuncio.pontoMidia.nomeEmpresa} · {anuncio.pontoMidia.cidade}/{anuncio.pontoMidia.uf}
-                      </p>
-
-                      {/* Métricas — só para ativos */}
-                      {anuncio.status === "ATIVO" && (
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-[11px] text-[#344054]">
-                            <strong className="text-[#0E1F66]">{anuncio.exibicoesHoje ?? 0}</strong> hoje
-                          </span>
-                          <span className="text-[#CBD5E1]">·</span>
-                          <span className="text-[11px] text-[#344054]">
-                            <strong className="text-[#0E1F66]">{anuncio.totalExibicoes ?? 0}</strong> total
-                          </span>
-                          {(anuncio.totalMinutosExibidos ?? 0) > 0 && (
-                            <>
-                              <span className="text-[#CBD5E1]">·</span>
-                              <span className="text-[11px] text-[#344054]">
-                                <strong className="text-[#0E1F66]">{anuncio.totalMinutosExibidos}</strong> min no ar
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {anuncio.status === "REJEITADO" && anuncio.motivoRejeicao && (
-                        <p className="text-[11px] text-rose-700 mt-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 inline-block">
-                          {anuncio.motivoRejeicao}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Data e Ações */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] text-[#9AA3AF] hidden sm:block">
-                        {new Date(anuncio.criadoEm).toLocaleDateString("pt-BR")}
-                      </span>
-
-                      <button
-                        type="button"
-                        title="Visualizar peça"
-                        onClick={() => setPreviewAd(anuncio)}
-                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-[#4F93C9] hover:bg-[#4F93C9]/10 transition cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-
-                      <button
-                        type="button"
-                        title="Solicitar remoção desta campanha"
-                        onClick={() => handleOpenRemovalModal(anuncio)}
-                        className="p-2 rounded-xl text-[#9AA3AF] hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Modal de Pré-visualização da Peça */}
-      <Modal
-        isOpen={Boolean(previewAd)}
-        onClose={() => setPreviewAd(null)}
-        title={previewAd?.titulo || "Visualização da Campanha"}
-        description={previewAd ? `Exibição programada para: ${previewAd.pontoMidia.nomeEmpresa} (${previewAd.pontoMidia.cidade}/${previewAd.pontoMidia.uf})` : ""}
-        size="lg"
-      >
-        {previewAd && (
-          <div className="space-y-4">
-            <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center relative">
-              {previewAd.tipoMidia === "VIDEO" ? (
-                <video
-                  src={previewAd.midiaUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain"
-                />
+              ) : visiveis.length === 0 ? (
+                <p className="rounded-2xl bg-white px-6 py-10 text-center text-sm text-[#8A93A3] ring-1 ring-[#E4E7EC]/80">
+                  Nenhuma campanha neste filtro.
+                </p>
               ) : (
-                <img
-                  src={previewAd.midiaUrl}
-                  alt={previewAd.titulo}
-                  className="w-full h-full object-contain"
-                />
+                <div key={filtro} className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+                  {visiveis.map((anuncio, i) => (
+                    <article
+                      key={anuncio.id}
+                      className="group overflow-hidden rounded-2xl bg-white ring-1 ring-[#E4E7EC]/80 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:shadow-lg animate-fade-in"
+                      style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAd(anuncio)}
+                        className="relative block aspect-video w-full overflow-hidden bg-[#0E1F66] cursor-pointer"
+                        title="Ver peça"
+                      >
+                        <Midia
+                          anuncio={anuncio}
+                          className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
+                        />
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                        <span className="absolute left-3 top-3 rounded-full bg-white/95 shadow-sm">
+                          <StatusPill status={anuncio.status} tvOnline={anuncio.pontoMidia.tvOnline} posicaoFila={anuncio.posicaoFila} />
+                        </span>
+                        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 text-[11px] font-medium text-white/90">
+                          <Icon name={anuncio.tipoMidia === "VIDEO" ? "play" : "eye"} className="h-3.5 w-3.5" />
+                          {anuncio.tipoMidia === "VIDEO" ? `Vídeo · ${anuncio.duracaoSegundos}s` : `Imagem · ${anuncio.duracaoSegundos}s`}
+                        </span>
+                        <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0E1F66] shadow-lg">
+                            <Icon name="eye" className="h-5 w-5" />
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="line-clamp-1 text-[15px] font-semibold text-[#0E1F66]">{anuncio.titulo}</h3>
+                          <button
+                            type="button"
+                            title="Solicitar remoção"
+                            onClick={() => handleOpenRemovalModal(anuncio)}
+                            className="-mr-1 -mt-1 rounded-lg p-1.5 text-[#AEB6C4] opacity-0 transition hover:bg-amber-50 hover:text-amber-600 group-hover:opacity-100 cursor-pointer"
+                          >
+                            <Icon name="flag" className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <p className="mt-1 truncate text-[13px] text-[#8A93A3]">
+                          {anuncio.pontoMidia.nomeEmpresa} · {anuncio.pontoMidia.cidade}/{anuncio.pontoMidia.uf}
+                        </p>
+
+                        {anuncio.status === "ATIVO" && (
+                          <div className="mt-4 flex items-center gap-5 border-t border-[#EEF0F3] pt-3.5 text-[13px]">
+                            <span className="text-[#667085]">
+                              <strong className="font-semibold text-[#0E1F66]">{(anuncio.exibicoesHoje ?? 0).toLocaleString("pt-BR")}</strong> hoje
+                            </span>
+                            <span className="text-[#667085]">
+                              <strong className="font-semibold text-[#0E1F66]">{(anuncio.totalExibicoes ?? 0).toLocaleString("pt-BR")}</strong> no total
+                            </span>
+                          </div>
+                        )}
+                        {anuncio.status === "APROVADO" && (
+                          <button
+                            type="button"
+                            onClick={() => setPagandoId(anuncio.id)}
+                            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[13px] font-medium text-white transition hover:bg-emerald-700 cursor-pointer"
+                          >
+                            Pagar e ativar
+                            <Icon name="arrow" className="h-4 w-4" />
+                          </button>
+                        )}
+                        {anuncio.status === "REJEITADO" && anuncio.motivoRejeicao && (
+                          <p className="mt-3 line-clamp-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700">
+                            {anuncio.motivoRejeicao}
+                          </p>
+                        )}
+                        {(anuncio.status === "PENDENTE" || anuncio.status === "FILA_ESPERA") && (
+                          <p className="mt-4 flex items-center gap-1.5 border-t border-[#EEF0F3] pt-3.5 text-xs text-[#8A93A3]">
+                            <Icon name="hourglass" className="h-3.5 w-3.5" />
+                            {anuncio.status === "PENDENTE" ? "Análise em até 24h" : "Entra no ar quando abrir uma vaga"}
+                          </p>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-[#F7F8FA] rounded-2xl border border-[#E4E7EC] text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Status</span>
-                <div className="mt-1">
-                  <StatusPill status={previewAd.status} tvOnline={previewAd.pontoMidia.tvOnline} />
+            {/* ── Coluna lateral ────────────────────────────── */}
+            <aside className="space-y-5">
+              <Painel className="p-5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <p className="text-[13px] font-medium text-[#667085]">Investimento mensal</p>
+                  <span className="text-[11px] text-[#AEB6C4]">cotas ativas</span>
                 </div>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Duração</span>
-                <p className="font-bold text-[#0E1F66] mt-1">{previewAd.duracaoSegundos} segundos</p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Exibições Hoje</span>
-                <p className="font-bold text-[#0E1F66] mt-1">{previewAd.exibicoesHoje ?? 0}</p>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-[#9AA3AF]">Total Exibições</span>
-                <p className="font-bold text-[#1E4333] mt-1">{previewAd.totalExibicoes ?? 0}</p>
-              </div>
+                <p className="mt-2 font-heading text-3xl font-semibold tracking-tight text-[#0E1F66]">{moeda(investimento)}</p>
+
+                {stats?.financeiro?.detalhamentoCampanhas?.length ? (
+                  <ul className="mt-5 space-y-3 border-t border-[#EEF0F3] pt-4">
+                    {stats.financeiro.detalhamentoCampanhas.map((item) => (
+                      <li key={item.anuncioId} className="flex items-center gap-3">
+                        <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", TIER_CLASSE[item.tier] ?? TIER_CLASSE.Bronze)}>
+                          {item.tier}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium text-[#344054]">{item.pontoNome}</p>
+                          <p className="truncate text-[11px] text-[#AEB6C4]">{item.titulo}</p>
+                        </div>
+                        <span className="text-[13px] font-medium text-[#0E1F66]">{moeda(item.cotaMensal)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 border-t border-[#EEF0F3] pt-4 text-[13px] text-[#8A93A3]">Nenhuma cota ativa no momento.</p>
+                )}
+              </Painel>
+
+              <Link
+                href="/anunciante/mapa"
+                className="group relative block overflow-hidden rounded-2xl bg-[#0E1F66] p-5 text-white shadow-md animate-fade-in"
+                style={{ animationDelay: "120ms" }}
+              >
+                <div className="absolute -right-6 -top-6 flex rotate-6 gap-2 opacity-60 transition duration-500 group-hover:opacity-80 group-hover:rotate-3">
+                  {["gym1", "rest1", "dent1"].map((f) => (
+                    <img key={f} src={`/uploads/demo/pontos/${f}.webp`} alt="" className="h-20 w-16 rounded-lg object-cover" loading="lazy" />
+                  ))}
+                </div>
+                <div className="relative mt-14">
+                  <p className="font-heading text-lg font-semibold">Encontre novas telas</p>
+                  <p className="mt-1 text-[13px] text-white/65">Academias, clínicas, restaurantes e mais na sua região.</p>
+                  <span className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#8EC3EA]">
+                    Abrir mapa
+                    <Icon name="arrow" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </Link>
+            </aside>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de pré-visualização da peça */}
+      <Modal
+        isOpen={Boolean(previewAd)}
+        onClose={() => setPreviewAd(null)}
+        title={previewAd?.titulo || "Campanha"}
+        description={previewAd ? `${previewAd.pontoMidia.nomeEmpresa} · ${previewAd.pontoMidia.cidade}/${previewAd.pontoMidia.uf}` : ""}
+        size="lg"
+      >
+        {previewAd && (
+          <div className="space-y-5">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-black">
+              {previewAd.tipoMidia === "VIDEO" ? (
+                <video src={previewAd.midiaUrl} controls autoPlay className="h-full w-full object-contain" />
+              ) : (
+                <img src={previewAd.midiaUrl} alt={previewAd.titulo} className="h-full w-full object-contain" />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { rotulo: "Status", valor: <StatusPill status={previewAd.status} tvOnline={previewAd.pontoMidia.tvOnline} /> },
+                { rotulo: "Duração", valor: `${previewAd.duracaoSegundos}s` },
+                { rotulo: "Exibições hoje", valor: (previewAd.exibicoesHoje ?? 0).toLocaleString("pt-BR") },
+                { rotulo: "No total", valor: (previewAd.totalExibicoes ?? 0).toLocaleString("pt-BR") },
+              ].map((d) => (
+                <div key={d.rotulo} className="rounded-xl bg-[#F7F8FA] px-3.5 py-3">
+                  <p className="text-[11px] text-[#8A93A3]">{d.rotulo}</p>
+                  <div className="mt-1 text-sm font-semibold text-[#0E1F66]">{d.valor}</div>
+                </div>
+              ))}
             </div>
 
             {previewAd.status === "REJEITADO" && previewAd.motivoRejeicao && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
-                <strong>Motivo da Recusa:</strong> {previewAd.motivoRejeicao}
+              <div className="rounded-xl bg-rose-50 p-3.5 text-[13px] text-rose-700">
+                <strong className="font-semibold">Motivo:</strong> {previewAd.motivoRejeicao}
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-[#E4E7EC]">
+            <div className="flex items-center justify-between border-t border-[#EEF0F3] pt-4">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={() => {
                   const ad = previewAd;
                   setPreviewAd(null);
                   handleOpenRemovalModal(ad);
                 }}
-                className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200"
+                className="text-amber-700 hover:bg-amber-50 hover:text-amber-800"
               >
-                <svg className="w-4 h-4 mr-1.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Solicitar Remoção à Moderação
+                <Icon name="flag" className="h-4 w-4" />
+                Solicitar remoção
               </Button>
-
-              <Button variant="ghost" size="sm" onClick={() => setPreviewAd(null)}>
+              <Button variant="secondary" size="sm" onClick={() => setPreviewAd(null)}>
                 Fechar
               </Button>
             </div>
@@ -599,81 +544,69 @@ export default function AnuncianteDashboard() {
         )}
       </Modal>
 
-      {/* Modal de Solicitação de Remoção */}
+      {/* Modal de solicitação de remoção */}
       <Modal
         isOpen={removalModalOpen}
         onClose={() => !requestingRemoval && setRemovalModalOpen(false)}
-        title="Solicitar Remoção de Campanha"
-        description="Envie um pedido à administração para remover ou desvincular este anúncio."
+        title="Solicitar remoção"
+        description="A equipe de moderação vai analisar o pedido e remover a peça da tela."
       >
         <div className="space-y-4">
-          {requestError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
-              {requestError}
-            </div>
-          )}
+          {requestError && <div className="rounded-xl bg-rose-50 p-3 text-[13px] text-rose-700">{requestError}</div>}
 
           {adToRequestRemoval && (
-            <div className="p-3.5 bg-[#F7F8FA] border border-[#E4E7EC] rounded-2xl flex items-center gap-3.5">
-              <div className="w-14 h-10 bg-[#0E1F66] rounded-lg overflow-hidden shrink-0">
-                {adToRequestRemoval.tipoMidia === "VIDEO" ? (
-                  <video src={adToRequestRemoval.midiaUrl} muted className="w-full h-full object-cover" />
-                ) : (
-                  <img src={adToRequestRemoval.midiaUrl} alt={adToRequestRemoval.titulo} className="w-full h-full object-cover" />
-                )}
+            <div className="flex items-center gap-3.5 rounded-2xl bg-[#F7F8FA] p-3">
+              <div className="h-11 w-16 shrink-0 overflow-hidden rounded-lg bg-[#0E1F66]">
+                <Midia anuncio={adToRequestRemoval} className="h-full w-full object-cover" />
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-[#0E1F66] text-sm truncate">{adToRequestRemoval.titulo}</p>
-                <p className="text-xs text-[#9AA3AF] truncate">
-                  Ponto: {adToRequestRemoval.pontoMidia.nomeEmpresa} ({adToRequestRemoval.pontoMidia.cidade})
+                <p className="truncate text-sm font-semibold text-[#0E1F66]">{adToRequestRemoval.titulo}</p>
+                <p className="truncate text-xs text-[#8A93A3]">
+                  {adToRequestRemoval.pontoMidia.nomeEmpresa} · {adToRequestRemoval.pontoMidia.cidade}
                 </p>
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#344054] mb-1.5">
-              Motivo da Solicitação <span className="text-rose-500">*</span>
+            <label className="mb-1.5 block text-[13px] font-medium text-[#344054]">
+              Motivo <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={3}
-              className="w-full rounded-xl border border-[#E4E7EC] p-3 text-xs text-[#0E1F66] placeholder:text-[#9AA3AF] focus:border-[#4F93C9] focus:ring-2 focus:ring-[#4F93C9]/20 outline-none transition"
-              placeholder="Explique o motivo para remoção (ex: encerramento antecipado da campanha, alteração de material, erro na veiculação...)"
+              className="w-full rounded-xl border border-[#E4E7EC] p-3 text-sm text-[#101828] placeholder:text-[#9AA3AF] outline-none transition focus:border-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/15"
+              placeholder="Ex.: encerramento antecipado, troca de material, erro na veiculação..."
               value={motivoRemocao}
               onChange={(e) => setMotivoRemocao(e.target.value)}
             />
           </div>
 
-          <p className="text-xs text-[#92400E] leading-relaxed bg-[#FEF3C7] p-3 rounded-xl border border-[#FCD34D]">
-            <strong>Informação importante:</strong> Apenas a administração pode excluir peças ativas da rede. Seu pedido será analisado pela equipe de moderação e a exclusão da mídia e desvinculação da TV serão processadas em seguida.
+          <p className="flex gap-2.5 rounded-xl bg-[#4F93C9]/[0.07] p-3 text-xs leading-relaxed text-[#1F5A8A]">
+            <Icon name="info" className="h-4 w-4 shrink-0" />
+            Apenas a administração remove peças ativas. Você será notificado assim que o pedido for processado.
           </p>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E4E7EC]">
+          <div className="flex items-center justify-end gap-2 border-t border-[#EEF0F3] pt-4">
             <Button variant="ghost" onClick={() => setRemovalModalOpen(false)} disabled={requestingRemoval}>
               Cancelar
             </Button>
             <Button
-              variant="gradient"
+              variant="navy"
               loading={requestingRemoval}
               disabled={!motivoRemocao.trim() || motivoRemocao.trim().length < 5}
               onClick={handleConfirmRequestRemoval}
             >
-              Enviar Solicitação
+              Enviar solicitação
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-emerald-700 text-white rounded-2xl shadow-xl text-xs font-bold animate-fade-in border border-emerald-500">
-          <svg className="w-4 h-4 text-emerald-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{toastMessage}</span>
-          <button type="button" onClick={() => setToastMessage(null)} className="ml-2 text-emerald-200 hover:text-white cursor-pointer">✕</button>
-        </div>
+      {pagandoId !== null && (
+        <PagamentoPixModal anuncioId={pagandoId} onClose={() => setPagandoId(null)} onPago={() => window.location.reload()} />
       )}
+
+      {toastMessage && <Toast mensagem={toastMessage} onClose={() => setToastMessage(null)} />}
     </DashboardLayout>
   );
 }

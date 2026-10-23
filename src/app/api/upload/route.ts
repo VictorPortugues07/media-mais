@@ -15,7 +15,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
     }
 
-    const result = await uploadFile(file);
+    // "avatar" = foto de perfil / logotipo (redimensionada para 512px); padrão = mídia de anúncio/estabelecimento
+    const variante = formData.get("variante") === "avatar" ? "avatar" : "midia";
+    const result = await uploadFile(file, variante);
     return Response.json(result, { status: 201 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Erro no upload";

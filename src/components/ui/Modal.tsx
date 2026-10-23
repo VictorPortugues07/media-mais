@@ -72,21 +72,21 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-[#0E1F66]/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#0A1240]/45 backdrop-blur-[3px] transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
       <div
         className={cn(
-          "relative w-full bg-white rounded-2xl shadow-xl border border-[#E4E7EC] overflow-hidden z-10 animate-fade-in",
+          "relative w-full bg-white rounded-2xl shadow-2xl ring-1 ring-[#0E1F66]/[0.06] overflow-hidden z-10 animate-fade-in max-h-[90vh] overflow-y-auto",
           sizes[size]
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E4E7EC]">
+        <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#EEF0F3]">
           <div>
             {title && (
-              <h3 id={titleId} className="text-lg font-bold text-[#0E1F66] font-heading">
+              <h3 id={titleId} className="text-base font-semibold text-[#0E1F66] font-heading">
                 {title}
               </h3>
             )}

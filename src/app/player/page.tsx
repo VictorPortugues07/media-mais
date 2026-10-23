@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { TVFrame } from "@/components/tv/TVFrame";
 import { Logo } from "@/components/ui/Logo";
 import { PlayerErrorBoundary } from "@/components/tv/PlayerErrorBoundary";
+import { HouseSlot, HOUSE_SLOT_SEGUNDOS } from "@/components/tv/HouseSlot";
+
+// A cada ~2 minutos de anúncios pagos, entra o bloco institucional (local + "Anuncie aqui").
+const INTERVALO_CASA_SEGUNDOS = 120;
 
 interface TVAnuncio {
   id: number;
@@ -49,6 +52,8 @@ function StandaloneTVPlayerInner() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
+  const [slotCasa, setSlotCasa] = useState(false);
+  const [controlesVisiveis, setControlesVisiveis] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -58,6 +63,8 @@ function StandaloneTVPlayerInner() {
   const lastTelemetryTimeRef = useRef(0);
   const anunciosRef = useRef<TVAnuncio[]>(anuncios);
   const isSyncingRef = useRef(false);
+  const segundosDesdeCasaRef = useRef(0);
+  const controlesTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     anunciosRef.current = anuncios;
@@ -402,6 +409,15 @@ function StandaloneTVPlayerInner() {
       registrarExibicao(currentAd);
     }
 
+    // Programa o bloco institucional após ~2 min de anúncios pagos exibidos
+    if (currentAd && !fromError) {
+      segundosDesdeCasaRef.current += currentAd.duracaoSegundos || 10;
+    }
+    if (segundosDesdeCasaRef.current >= INTERVALO_CASA_SEGUNDOS) {
+      segundosDesdeCasaRef.current = 0;
+      setSlotCasa(true);
+    }
+
     setCycleCount((c) => c + 1);
 
     if (currentList.length === 1) {
@@ -442,6 +458,8 @@ function StandaloneTVPlayerInner() {
     }
     isHandlingErrorRef.current = false;
 
+    // Durante o bloco institucional, a mídia paga fica pausada (sem timers nem telemetria)
+    if (slotCasa) return;
     if (anuncios.length === 0 || !ponto) return;
 
     const currentAd = anuncios[currentIndex] || anuncios[0];
@@ -473,7 +491,33 @@ function StandaloneTVPlayerInner() {
         errorTimerRef.current = null;
       }
     };
-  }, [currentIndex, cycleCount, anuncios, ponto]);
+  }, [currentIndex, cycleCount, anuncios, ponto, slotCasa]);
+
+  // Encerra o bloco institucional e devolve a tela aos anúncios pagos
+  useEffect(() => {
+    if (!slotCasa) return;
+    const timer = setTimeout(() => setSlotCasa(false), HOUSE_SLOT_SEGUNDOS * 1000);
+    return () => clearTimeout(timer);
+  }, [slotCasa]);
+
+  // Controles de operação (pareamento, posição no loop) só aparecem ao mexer no mouse/controle remoto
+  useEffect(() => {
+    if (!ponto) return;
+    const mostrar = () => {
+      setControlesVisiveis(true);
+      if (controlesTimerRef.current) clearTimeout(controlesTimerRef.current);
+      controlesTimerRef.current = setTimeout(() => setControlesVisiveis(false), 4000);
+    };
+    window.addEventListener("mousemove", mostrar);
+    window.addEventListener("keydown", mostrar);
+    window.addEventListener("touchstart", mostrar);
+    return () => {
+      window.removeEventListener("mousemove", mostrar);
+      window.removeEventListener("keydown", mostrar);
+      window.removeEventListener("touchstart", mostrar);
+      if (controlesTimerRef.current) clearTimeout(controlesTimerRef.current);
+    };
+  }, [ponto]);
 
   // Teclado numérico / input handlers com suporte a controle remoto de Smart TV
   const handleVirtualKey = (num: string) => {
@@ -571,119 +615,209 @@ function StandaloneTVPlayerInner() {
     }
   };
 
-  // Se estiver carregando verificação inicial
+  // Fundo padrão das telas do player (mesma linguagem da home e dos painéis)
+  const fundoMarca = (
+    <>
+      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(70%_80%_at_85%_10%,rgba(79,147,201,0.32),transparent_60%)]" />
+      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(50%_60%_at_0%_100%,rgba(143,174,158,0.16),transparent_60%)]" />
+      <div aria-hidden="true" className="absolute inset-0 opacity-50 [background-image:radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
+    </>
+  );
+
+  const modalDesconexao = showDisconnectModal ? (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#05092A]/80 backdrop-blur-md p-6 animate-fade-in"
+    >
+      <div className="w-full max-w-sm rounded-3xl bg-[#0E1F66] p-8 text-center shadow-2xl ring-1 ring-white/10">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F2795C]/15 text-[#F7A895]">
+          <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </span>
+        <h3 className="mt-5 font-heading text-xl font-semibold text-white">Desconectar esta TV?</h3>
+        <p className="mt-2 text-sm leading-relaxed text-white/60">
+          A transmissão será encerrada e a tela voltará a pedir um código de conexão.
+        </p>
+        <div className="mt-7 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            tabIndex={0}
+            onClick={() => setShowDisconnectModal(false)}
+            className="rounded-xl bg-white/10 py-3 text-sm font-medium text-white outline-none transition hover:bg-white/15 focus:bg-white focus:text-[#0E1F66] cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            tabIndex={0}
+            onClick={executarDesconexao}
+            className="rounded-xl bg-rose-600 py-3 text-sm font-medium text-white outline-none transition hover:bg-rose-500 focus:ring-4 focus:ring-rose-400/40 cursor-pointer"
+          >
+            Desconectar
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // Carregando verificação inicial
   if (loading) {
     return (
-      <div className="w-screen h-screen bg-[#0E1F66] flex flex-col items-center justify-center text-white">
-        <div className="w-14 h-14 border-4 border-[#4F93C9] border-t-transparent rounded-full animate-spin mb-4" />
-        <Logo className="h-8 w-auto mb-3" whiteText />
-        <p className="text-xs font-bold tracking-widest uppercase text-white/80">
-          Iniciando Player Media+...
-        </p>
+      <div className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-[#0B1A57] text-white">
+        {fundoMarca}
+        <div className="relative flex flex-col items-center animate-fade-in">
+          <div className="relative flex h-20 w-20 items-center justify-center">
+            <span className="absolute inset-0 rounded-full border border-white/15 animate-signal" />
+            <span className="absolute inset-0 rounded-full border border-white/15 animate-signal" style={{ animationDelay: "0.8s" }} />
+            <img src="/logo.svg" alt="Media+" className="relative h-10 w-auto" />
+          </div>
+          <p className="mt-6 text-sm text-white/60">Iniciando o player…</p>
+        </div>
       </div>
     );
   }
 
-  // BLOQUEIO: Dispositivo mobile detectado
+  // BLOQUEIO: dispositivo móvel detectado
   if (isMobileDevice) {
     return (
-      <div className="w-screen min-h-screen bg-[#081342] flex flex-col items-center justify-center p-6 text-white select-none">
-        <div className="w-full max-w-md flex flex-col items-center text-center">
-          <Logo className="h-10 w-auto mb-6" whiteText />
-
-          <div className="bg-[#0E1F66]/95 backdrop-blur-xl border border-amber-500/30 p-8 rounded-3xl shadow-2xl w-full">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center text-3xl mx-auto mb-4">
-              &#128249;
-            </div>
-            <h1 className="text-xl font-extrabold font-heading text-white tracking-tight">
-              Player Exclusivo para Smart TV
-            </h1>
-            <p className="text-xs text-amber-200/80 mt-3 leading-relaxed">
-              Este player foi desenvolvido exclusivamente para ser exibido em Smart TVs e monitores de grande formato.
+      <div className="relative flex min-h-screen w-screen flex-col items-center justify-center overflow-hidden bg-[#0B1A57] p-6 text-white select-none">
+        {fundoMarca}
+        <div className="relative w-full max-w-sm text-center animate-fade-in">
+          <Logo className="mx-auto h-8 w-auto" whiteText />
+          <div className="mt-8 rounded-3xl bg-white/[0.06] p-8 ring-1 ring-white/10 backdrop-blur-sm">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4F93C9]/15 text-[#8EC3EA]">
+              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <h1 className="mt-5 font-heading text-xl font-semibold">Abra este link na sua TV</h1>
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              O player foi feito para Smart TVs e monitores. No navegador da TV, acesse este mesmo endereço e digite o código
+              de 6 números do seu painel.
             </p>
-            <p className="text-xs text-blue-100/70 mt-2 leading-relaxed">
-              Para conectar sua TV, acesse este link diretamente no navegador da sua Smart TV e digite o codigo de 6 digitos gerado no seu painel.
+            <p className="mt-5 rounded-xl bg-white/[0.06] px-3 py-2 font-mono text-xs text-white/70">
+              {typeof window !== "undefined" ? `${window.location.host}/player` : "/player"}
             </p>
-
-            <div className="mt-5 p-3 bg-amber-500/10 border border-amber-400/20 rounded-xl">
-              <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wider">
-                Dispositivo detectado: Celular
-              </p>
-              <p className="text-[10px] text-amber-200/60 mt-1">
-                Resolucao: {typeof window !== "undefined" ? `${window.screen.width}x${window.screen.height}` : "N/A"}
-              </p>
-            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // TELA 1: Pareamento por Código Numérico
+  // TELA 1: Pareamento por código numérico
   if (!ponto) {
-    return (
-      <div className="w-screen min-h-screen bg-[#081342] flex flex-col items-center justify-center p-6 text-white select-none">
-        <div className="w-full max-w-xl flex flex-col items-center text-center">
-          <Logo className="h-10 sm:h-12 w-auto mb-6" whiteText />
+    const codigoCompleto = codeDigits.join("").length === 6 && !codeDigits.includes("");
+    const passos = [
+      { titulo: "Abra o painel do estabelecimento", texto: "No celular ou computador, entre na sua conta Media+." },
+      { titulo: "Veja o código de conexão", texto: "São 6 números que se renovam a cada 30 segundos." },
+      { titulo: "Digite o código aqui", texto: "Use os números do controle remoto ou o teclado ao lado." },
+    ];
+    const teclaBase =
+      "flex h-[clamp(52px,6.2vh,72px)] items-center justify-center rounded-2xl text-[clamp(20px,2.4vh,28px)] font-medium outline-none transition-all duration-150 cursor-pointer focus:scale-105 focus:ring-4 active:scale-95";
 
-          <div className="bg-[#0E1F66]/95 backdrop-blur-xl border border-[#4F93C9]/30 p-8 sm:p-10 rounded-3xl shadow-2xl w-full">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#4F93C9]/20 text-[#8ec3ea] border border-[#4F93C9]/30 mb-3">
-              <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <span>Conectar Nova TV</span>
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-white tracking-tight">
-              Digite o Código da Sua TV
+    return (
+      <div className="relative min-h-screen w-screen overflow-hidden bg-[#0B1A57] text-white select-none">
+        {fundoMarca}
+
+        <div className="relative mx-auto grid min-h-screen max-w-[1400px] items-center gap-12 px-8 py-10 lg:grid-cols-[1fr_minmax(420px,520px)] lg:gap-20 lg:px-16">
+          {/* Orientações */}
+          <div className="animate-fade-in">
+            <Logo className="h-9 w-auto" whiteText />
+            <p className="mt-12 text-sm font-medium text-[#8EC3EA]">Player da TV</p>
+            <h1 className="mt-3 font-heading text-[clamp(32px,4.4vw,60px)] font-semibold leading-[1.05] tracking-tight">
+              Conecte esta TV
+              <br />à rede Media+
             </h1>
-            <p className="text-xs sm:text-sm text-blue-100/80 mt-2 max-w-md mx-auto">
-              Abra o painel do seu estabelecimento no celular ou computador e digite o código de 6 números gerado para sua tela.
+            <p className="mt-5 max-w-md text-[clamp(15px,1.25vw,18px)] leading-relaxed text-white/60">
+              Em poucos segundos sua tela começa a exibir os anúncios aprovados para o seu estabelecimento.
             </p>
 
-            {errorMessage && (
-              <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-2xl text-xs font-bold text-rose-300">
-                {errorMessage}
-              </div>
-            )}
+            <ol className="mt-10 space-y-5">
+              {passos.map((p, i) => (
+                <li
+                  key={p.titulo}
+                  className="flex items-start gap-4"
+                  style={{ animation: `wordIn 0.6s var(--ease-out-soft) ${200 + i * 120}ms both` }}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-sm font-semibold text-white ring-1 ring-white/15">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="text-[clamp(15px,1.2vw,18px)] font-medium text-white">{p.titulo}</p>
+                    <p className="mt-0.5 text-sm text-white/50">{p.texto}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
 
-            {/* Visualização dos 6 Dígitos em Destaque para Leitura à Distância na TV */}
-            <div className="flex justify-center gap-2 sm:gap-3.5 my-6 sm:my-8">
+          {/* Entrada do código */}
+          <div
+            className="rounded-[28px] bg-white/[0.06] p-7 ring-1 ring-white/10 backdrop-blur-md sm:p-9"
+            style={{ animation: "wordIn 0.8s var(--ease-out-soft) 0.15s both" }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-white/85">Código de conexão</p>
+              <span className="inline-flex items-center gap-1.5 text-xs text-white/45">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                renova a cada 30s
+              </span>
+            </div>
+
+            {/* 6 dígitos — mesmo visual do painel do estabelecimento */}
+            <div className="mt-6 flex gap-2 sm:gap-2.5">
               {codeDigits.map((digit, idx) => {
-                const isCurrent = activeDigitIndex === idx;
+                const atual = activeDigitIndex === idx && !digit;
                 return (
                   <div
                     key={idx}
                     onClick={() => setActiveDigitIndex(idx)}
-                    className={`w-12 h-16 sm:w-16 sm:h-22 text-3xl sm:text-4xl font-black font-mono flex items-center justify-center rounded-2xl border-2 transition-all cursor-pointer ${
+                    className={`relative flex h-[clamp(64px,8.5vh,92px)] flex-1 items-center justify-center rounded-2xl font-mono text-[clamp(28px,4vh,44px)] font-semibold transition-all duration-200 cursor-pointer ${
                       digit
-                        ? "bg-[#4F93C9] text-white border-white shadow-xl shadow-[#4F93C9]/40 scale-100"
-                        : isCurrent
-                        ? "bg-[#0A174E] text-white border-[#4F93C9] ring-4 ring-[#4F93C9]/30 animate-pulse"
-                        : "bg-[#081342] text-white/30 border-white/15"
+                        ? "bg-white text-[#0E1F66] shadow-lg shadow-[#4F93C9]/20"
+                        : atual
+                        ? "bg-[#05092A]/60 ring-2 ring-[#4F93C9]"
+                        : "bg-[#05092A]/60 ring-1 ring-white/10"
                     }`}
                   >
-                    {digit ? digit : isCurrent ? "_" : "•"}
+                    {digit ? (
+                      <span key={digit + idx} className="animate-word-in">{digit}</span>
+                    ) : atual ? (
+                      <span className="h-[40%] w-[3px] rounded-full bg-[#8EC3EA] animate-pulse" />
+                    ) : null}
                   </div>
                 );
               })}
             </div>
 
-            {connecting && (
-              <div className="flex items-center justify-center gap-2 text-xs text-[#4F93C9] font-bold mb-4 animate-pulse">
-                <div className="w-4 h-4 border-2 border-[#4F93C9] border-t-transparent rounded-full animate-spin" />
-                Validando conexão com a rede Media+...
-              </div>
-            )}
+            <div className="mt-4 min-h-[44px]">
+              {errorMessage ? (
+                <p className="flex items-center gap-2 rounded-xl bg-rose-500/15 px-3.5 py-2.5 text-sm text-rose-200 animate-fade-in">
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {errorMessage}
+                </p>
+              ) : connecting ? (
+                <p className="flex items-center gap-2.5 px-1 py-2.5 text-sm text-[#8EC3EA] animate-fade-in">
+                  <span className="h-4 w-4 rounded-full border-2 border-[#8EC3EA] border-t-transparent animate-spin" />
+                  Conectando à rede Media+…
+                </p>
+              ) : null}
+            </div>
 
-            {/* Teclado Virtual Numérico em Tela com foco ampliado para Controle Remoto D-pad */}
-            <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+            {/* Teclado para controle remoto */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
                 <button
                   key={num}
                   type="button"
                   tabIndex={0}
-                  onClick={() => handleVirtualKey(num.toString())}
-                  className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-[#4F93C9] focus:bg-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/50 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
+                  onClick={() => handleVirtualKey(num)}
+                  className={`${teclaBase} bg-white/[0.07] text-white ring-1 ring-white/10 hover:bg-white/[0.12] focus:bg-white focus:text-[#0E1F66] focus:ring-[#4F93C9]/50`}
                 >
                   {num}
                 </button>
@@ -692,69 +826,94 @@ function StandaloneTVPlayerInner() {
                 type="button"
                 tabIndex={0}
                 onClick={() => handleVirtualKey("clear")}
-                className="h-14 sm:h-16 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 focus:bg-rose-600 focus:ring-4 focus:ring-rose-400 focus:scale-105 text-rose-200 focus:text-white border border-rose-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center"
+                className={`${teclaBase} text-[clamp(13px,1.5vh,15px)] text-white/60 hover:bg-white/[0.06] focus:bg-white/15 focus:text-white focus:ring-white/20`}
               >
-                LIMPAR
+                Limpar
               </button>
               <button
                 type="button"
                 tabIndex={0}
                 onClick={() => handleVirtualKey("0")}
-                className="h-14 sm:h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-[#4F93C9] focus:bg-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/50 focus:scale-105 focus:shadow-xl border border-white/15 text-2xl font-black text-white transition-all cursor-pointer flex items-center justify-center outline-none"
+                className={`${teclaBase} bg-white/[0.07] text-white ring-1 ring-white/10 hover:bg-white/[0.12] focus:bg-white focus:text-[#0E1F66] focus:ring-[#4F93C9]/50`}
               >
                 0
               </button>
               <button
                 type="button"
                 tabIndex={0}
+                aria-label="Apagar"
                 onClick={() => handleVirtualKey("backspace")}
-                className="h-14 sm:h-16 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 focus:bg-amber-600 focus:ring-4 focus:ring-amber-400 focus:scale-105 text-amber-200 focus:text-white border border-amber-400/20 text-xs font-black transition-all cursor-pointer outline-none flex items-center justify-center gap-1"
+                className={`${teclaBase} text-white/60 hover:bg-white/[0.06] focus:bg-white/15 focus:text-white focus:ring-white/20`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414a2 2 0 011.414-.586H19a2 2 0 012 2v10a2 2 0 01-2 2h-7.172a2 2 0 01-1.414-.586L3 12z" />
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414a2 2 0 011.414-.586H19a2 2 0 012 2v10a2 2 0 01-2 2h-7.172a2 2 0 01-1.414-.586L3 12z" />
                 </svg>
-                <span>APAGAR</span>
               </button>
             </div>
 
-            {codeDigits.join("").length === 6 && !codeDigits.includes("") && (
-              <button
-                type="button"
-                tabIndex={0}
-                onClick={() => connectWithCode(codeDigits.join(""))}
-                disabled={connecting}
-                className="w-full max-w-xs mx-auto mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-[#8FAE9E] to-[#4F93C9] hover:brightness-110 focus:ring-4 focus:ring-[#4F93C9]/40 focus:scale-[1.02] font-black text-sm text-white shadow-xl shadow-[#4F93C9]/30 transition-all cursor-pointer outline-none flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <button
+              type="button"
+              tabIndex={0}
+              onClick={() => connectWithCode(codeDigits.join(""))}
+              disabled={!codigoCompleto || connecting}
+              className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-[15px] font-medium outline-none transition-all duration-300 focus:ring-4 focus:ring-[#4F93C9]/40 ${
+                codigoCompleto
+                  ? "bg-white text-[#0E1F66] shadow-xl shadow-[#4F93C9]/25 hover:bg-[#EEF4FB] cursor-pointer"
+                  : "bg-white/[0.06] text-white/35 cursor-not-allowed"
+              }`}
+            >
+              {codigoCompleto ? "Conectar TV" : "Digite os 6 números"}
+              {codigoCompleto && (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6l6 6-6 6" />
                 </svg>
-                <span>CONECTAR TV AGORA</span>
-              </button>
-            )}
+              )}
+            </button>
           </div>
-
-          <p className="text-xs text-blue-100/60 mt-6 max-w-md mx-auto leading-relaxed">
-            Dica para Smart TV: você pode digitar os números (0 a 9) diretamente no teclado do seu controle remoto ou usar as setas e o botão OK.
-          </p>
         </div>
       </div>
     );
   }
 
-  // TELA 2: TV Sem anúncios ativos ainda
+  // TELA 2: TV conectada, ainda sem anúncios ativos
   if (anuncios.length === 0) {
     return (
-      <TVFrame
-        nomeEstabelecimento={ponto.nomeEmpresa}
-        pontoId={ponto.id}
-        totalAnuncios={0}
-        currentIndex={0}
+      <div
+        onDoubleClick={toggleFullScreen}
+        className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-[#0B1A57] text-white select-none"
+        style={{ cursor: controlesVisiveis ? "pointer" : "none" }}
       >
+        {fundoMarca}
+
+        <div aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          {[0, 0.9, 1.8].map((d) => (
+            <span
+              key={d}
+              className="absolute left-1/2 top-1/2 h-[46vh] w-[46vh] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.07] animate-signal"
+              style={{ animationDelay: `${d}s` }}
+            />
+          ))}
+        </div>
+
+        <div className="relative px-6 text-center animate-fade-in">
+          <img src="/logo.svg" alt="Media+" className="mx-auto h-[5vh] min-h-8 w-auto" />
+          <p className="mt-[5vh] inline-flex items-center gap-2 rounded-full bg-[#8FAE9E]/15 px-4 py-1.5 text-[clamp(13px,1.6vh,18px)] text-[#CFE6DB]">
+            <span className="h-2 w-2 rounded-full bg-[#8FAE9E] animate-pulse" />
+            TV conectada
+          </p>
+          <h1 className="mt-[3vh] font-heading text-[clamp(32px,6vh,72px)] font-semibold leading-tight tracking-tight">
+            {ponto.nomeEmpresa}
+          </h1>
+          <p className="mx-auto mt-[2vh] max-w-xl text-[clamp(15px,2vh,22px)] leading-relaxed text-white/60">
+            Tudo pronto. Assim que um anúncio for aprovado para esta tela, ele começa a ser exibido automaticamente.
+          </p>
+        </div>
+
         <div
-          onDoubleClick={toggleFullScreen}
-          className="w-full h-full flex flex-col items-center justify-center text-white p-6 text-center select-none cursor-pointer relative"
+          className={`absolute left-4 top-4 z-30 transition-opacity duration-300 focus-within:opacity-100 ${
+            controlesVisiveis ? "opacity-100" : "opacity-0"
+          }`}
         >
-          {/* Botão sutil para desconectar caso queira */}
           <button
             type="button"
             tabIndex={0}
@@ -762,90 +921,90 @@ function StandaloneTVPlayerInner() {
               e.stopPropagation();
               desconectarTV();
             }}
-            className="absolute top-4 left-4 text-[11px] uppercase font-bold tracking-wider text-white/70 hover:text-white focus:text-white bg-black/60 focus:bg-[#4F93C9] px-3 py-1.5 rounded-xl border border-white/20 focus:ring-2 focus:ring-[#4F93C9] backdrop-blur-md transition cursor-pointer outline-none flex items-center gap-1.5"
+            className="rounded-xl bg-black/50 px-3 py-1.5 text-[11px] font-medium text-white/80 outline-none ring-1 ring-white/15 backdrop-blur-md transition hover:text-white focus:bg-[#4F93C9] focus:text-white cursor-pointer"
           >
-            <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>Código: {pairedCode} (Trocar)</span>
+            Pareado: {pairedCode} · trocar
           </button>
-
-          <div className="w-20 h-20 rounded-3xl bg-[#4F93C9]/20 border border-[#4F93C9]/30 text-[#4F93C9] flex items-center justify-center mx-auto mb-4 shadow-2xl backdrop-blur-md">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-heading">
-            {ponto.nomeEmpresa}
-          </h2>
-          <p className="text-xs sm:text-sm text-blue-100/80 mt-2 max-w-lg leading-relaxed">
-            Canal de exibição conectado e pronto. Novos anúncios aprovados começarão a ser exibidos automaticamente.
-          </p>
-          <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold text-white">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#8FAE9E] animate-pulse" />
-            Transmissão Conectada (Código {pairedCode}) • Duplo clique para tela cheia
-          </div>
-
-          {/* Modal de confirmação de desconexão */}
-          {showDisconnectModal && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in"
-            >
-              <div className="bg-[#0E1F66] border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-                <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-300 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-400/30">
-                  <svg className="w-8 h-8 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-black text-white font-heading">
-                  Desconectar esta TV?
-                </h3>
-                <p className="text-xs text-blue-100/80 mt-2 leading-relaxed">
-                  A transmissão atual será encerrada e a tela voltará a solicitar um novo código de pareamento.
-                </p>
-                <div className="grid grid-cols-2 gap-3 mt-6">
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={() => setShowDisconnectModal(false)}
-                    className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 focus:bg-white/30 text-white text-xs font-bold transition outline-none cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={executarDesconexao}
-                    className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 focus:bg-rose-700 text-white text-xs font-bold transition outline-none cursor-pointer shadow-lg shadow-rose-600/30"
-                  >
-                    Desconectar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      </TVFrame>
+
+        {modalDesconexao}
+      </div>
     );
   }
 
-  // TELA 3: Player Ativo com Anúncios
+  // TELA 3: Player Ativo — anúncios pagos em tela cheia, sem moldura.
+  // As informações do local e o "Anuncie aqui" ficam no bloco institucional (HouseSlot).
   const currentAd = anuncios[currentIndex] || anuncios[0];
+  const totalMarcas = new Set(anuncios.map((a) => a.anunciante.nomeEmpresa)).size;
 
   return (
-    <TVFrame
-      nomeEstabelecimento={ponto.nomeEmpresa}
-      pontoId={ponto.id}
-      totalAnuncios={anuncios.length}
-      currentIndex={currentIndex}
+    <div
+      onDoubleClick={toggleFullScreen}
+      className="relative w-screen h-screen overflow-hidden bg-black select-none font-sans"
+      style={{ cursor: controlesVisiveis ? "pointer" : "none" }}
     >
+      {slotCasa ? (
+        <HouseSlot
+          pontoId={ponto.id}
+          nomeEstabelecimento={ponto.nomeEmpresa}
+          categoria={ponto.categoria}
+          cidade={ponto.cidade}
+          uf={ponto.uf}
+          totalMarcas={totalMarcas}
+        />
+      ) : currentAd?.tipoMidia === "VIDEO" ? (
+        <video
+          ref={videoRef}
+          key={`${currentAd.id}-${cycleCount}`}
+          src={currentAd.midiaUrl}
+          autoPlay
+          playsInline
+          muted
+          onEnded={() => {
+            if (timerRef.current) {
+              clearTimeout(timerRef.current);
+              timerRef.current = null;
+            }
+            nextAd(false);
+          }}
+          onError={() => {
+            handleMediaError(currentAd.titulo, currentAd.id);
+          }}
+          className="absolute inset-0 w-full h-full object-contain animate-fade-in"
+        />
+      ) : currentAd ? (
+        <div key={`${currentAd.id}-${cycleCount}`} className="absolute inset-0 animate-fade-in">
+          {/* Preenchimento desfocado para artes fora do 16:9 (evita faixas pretas) */}
+          <img
+            src={currentAd.midiaUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-3xl opacity-50"
+          />
+          <img
+            src={currentAd.midiaUrl}
+            alt={currentAd.titulo}
+            onError={() => {
+              handleMediaError(currentAd.titulo, currentAd.id);
+            }}
+            className="relative w-full h-full object-contain"
+          />
+        </div>
+      ) : null}
+
+      {/* Selo discreto da rede (identificação padrão em mídia indoor) */}
+      {!slotCasa && (
+        <div className="pointer-events-none absolute bottom-[2.4vh] right-[1.6vw] z-10 flex items-center gap-[0.5vw] rounded-full bg-black/25 px-[0.8vw] py-[0.45vw] backdrop-blur-sm opacity-70">
+          <img src="/logo.svg" alt="Media+" className="h-[1.3vw] min-h-3 w-auto brightness-0 invert" />
+        </div>
+      )}
+
+      {/* Controles de operação — ocultos para o público, aparecem com mouse/controle remoto */}
       <div
-        onDoubleClick={toggleFullScreen}
-        className="w-full h-full flex items-center justify-center relative select-none cursor-pointer"
+        className={`absolute top-4 left-4 z-30 flex items-center gap-2 transition-opacity duration-300 focus-within:opacity-100 ${
+          controlesVisiveis ? "opacity-100" : "opacity-0"
+        }`}
       >
-        {/* Botão para gerenciar conexão acessível via controle remoto */}
         <button
           type="button"
           tabIndex={0}
@@ -853,87 +1012,20 @@ function StandaloneTVPlayerInner() {
             e.stopPropagation();
             desconectarTV();
           }}
-          className="absolute top-4 left-4 z-30 text-[11px] font-bold text-white/70 hover:text-white focus:text-white bg-black/60 focus:bg-[#4F93C9] px-3 py-1.5 rounded-xl backdrop-blur-md border border-white/20 focus:ring-2 focus:ring-[#4F93C9] transition cursor-pointer outline-none flex items-center gap-1.5"
+          className="text-[11px] font-medium text-white/80 hover:text-white focus:text-white bg-black/60 focus:bg-[#4F93C9] px-3 py-1.5 rounded-xl backdrop-blur-md ring-1 ring-white/15 focus:ring-2 focus:ring-[#4F93C9] transition cursor-pointer outline-none flex items-center gap-1.5"
         >
-          <svg className="w-3.5 h-3.5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-[#8EC3EA]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <span>Pareado: {pairedCode}</span>
         </button>
-
-        {currentAd?.tipoMidia === "VIDEO" ? (
-          <video
-            ref={videoRef}
-            key={`${currentAd.id}-${cycleCount}`}
-            src={currentAd.midiaUrl}
-            autoPlay
-            playsInline
-            muted
-            onEnded={() => {
-              if (timerRef.current) {
-                clearTimeout(timerRef.current);
-                timerRef.current = null;
-              }
-              nextAd(false);
-            }}
-            onError={() => {
-              handleMediaError(currentAd.titulo, currentAd.id);
-            }}
-            className="w-full h-full object-contain"
-          />
-        ) : currentAd ? (
-          <img
-            key={`${currentAd.id}-${cycleCount}`}
-            src={currentAd.midiaUrl}
-            alt={currentAd.titulo}
-            onError={() => {
-              handleMediaError(currentAd.titulo, currentAd.id);
-            }}
-            className="w-full h-full object-contain animate-fade-in"
-          />
-        ) : null}
-
-        {/* Modal de confirmação de desconexão */}
-        {showDisconnectModal && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in"
-          >
-            <div className="bg-[#0E1F66] border border-white/20 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-              <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-300 flex items-center justify-center text-3xl mx-auto mb-4 border border-rose-400/30">
-                <svg className="w-8 h-8 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-black text-white font-heading">
-                Desconectar esta TV?
-              </h3>
-              <p className="text-xs text-blue-200/80 mt-2 leading-relaxed">
-                A transmissão atual será encerrada e a tela voltará a solicitar um novo código de pareamento.
-              </p>
-              <div className="grid grid-cols-2 gap-3 mt-6">
-                <button
-                  type="button"
-                  tabIndex={0}
-                  onClick={() => setShowDisconnectModal(false)}
-                  className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 focus:bg-white/30 text-white text-xs font-bold transition outline-none cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  tabIndex={0}
-                  onClick={executarDesconexao}
-                  className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 focus:bg-rose-700 text-white text-xs font-bold transition outline-none cursor-pointer shadow-lg shadow-rose-600/30"
-                >
-                  Desconectar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <span className="text-[11px] font-medium text-white/70 bg-black/60 px-3 py-1.5 rounded-xl backdrop-blur-md ring-1 ring-white/15">
+          {ponto.nomeEmpresa} · {slotCasa ? "Bloco institucional" : `Anúncio ${currentIndex + 1} de ${anuncios.length}`}
+        </span>
       </div>
-    </TVFrame>
+
+      {modalDesconexao}
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { z } from "zod";
 import { NextRequest } from "next/server";
+import { criarNotificacao } from "@/lib/notificacoes";
 
 const anuncioSchema = z.object({
   pontoMidiaId: z.number(),
@@ -9,7 +10,11 @@ const anuncioSchema = z.object({
   descricao: z.string().min(10, "Descricao deve ter no minimo 10 caracteres"),
   tipoMidia: z.enum(["VIDEO", "IMAGEM"]),
   midiaUrl: z.string().min(1, "Midia obrigatoria"),
-  duracaoSegundos: z.number().min(5, "Duração mínima é de 5 segundos").max(30, "Duração máxima permitida por vídeo/anúncio é de 30 segundos").optional(),
+  duracaoSegundos: z
+    .number()
+    .min(5, "Duração mínima é de 5 segundos")
+    .max(30, "Duração máxima permitida por vídeo/anúncio é de 30 segundos")
+    .optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -86,23 +91,24 @@ export async function GET(request: NextRequest) {
   // Buscar contagem de hoje, última exibição e soma histórica real de segundos para cada anúncio
   const metricasAnuncios = await Promise.all(
     anuncios.map(async (a) => {
-      const [exibicoesHoje, ultimaExibicao, duracaoTotalAgregada] = await Promise.all([
-        prisma.registroExibicao.count({
-          where: {
-            anuncioId: a.id,
-            exibidoEm: { gte: hoje },
-          },
-        }),
-        prisma.registroExibicao.findFirst({
-          where: { anuncioId: a.id },
-          orderBy: { exibidoEm: "desc" },
-          select: { exibidoEm: true },
-        }),
-        prisma.registroExibicao.aggregate({
-          where: { anuncioId: a.id },
-          _sum: { duracaoSegundos: true },
-        }),
-      ]);
+      const [exibicoesHoje, ultimaExibicao, duracaoTotalAgregada] =
+        await Promise.all([
+          prisma.registroExibicao.count({
+            where: {
+              anuncioId: a.id,
+              exibidoEm: { gte: hoje },
+            },
+          }),
+          prisma.registroExibicao.findFirst({
+            where: { anuncioId: a.id },
+            orderBy: { exibidoEm: "desc" },
+            select: { exibidoEm: true },
+          }),
+          prisma.registroExibicao.aggregate({
+            where: { anuncioId: a.id },
+            _sum: { duracaoSegundos: true },
+          }),
+        ]);
 
       const isOnline = a.pontoMidia.ultimaAtividade
         ? new Date(a.pontoMidia.ultimaAtividade) > doisMinutosAtras
@@ -110,7 +116,9 @@ export async function GET(request: NextRequest) {
 
       const totalExibicoes = a._count.registroExibicoes;
       // Usar a soma histórica real registrada em cada exibição
-      const totalSegundos = duracaoTotalAgregada._sum.duracaoSegundos ?? (totalExibicoes * a.duracaoSegundos);
+      const totalSegundos =
+        duracaoTotalAgregada._sum.duracaoSegundos ??
+        totalExibicoes * a.duracaoSegundos;
       const totalMinutos = Math.round(totalSegundos / 60);
 
       // Se estiver na fila de espera, calcular a posição na fila daquele ponto
@@ -138,7 +146,7 @@ export async function GET(request: NextRequest) {
           tvOnline: isOnline,
         },
       };
-    })
+    }),
   );
 
   return Response.json({ anuncios: metricasAnuncios });
@@ -158,7 +166,7 @@ export async function POST(request: NextRequest) {
     if (!anunciante) {
       return Response.json(
         { error: "Complete seu cadastro de anunciante primeiro" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -173,7 +181,7 @@ export async function POST(request: NextRequest) {
     if (!ponto || ponto.status !== "ATIVO") {
       return Response.json(
         { error: "Ponto de mídia não encontrado ou inativo" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -185,7 +193,7 @@ export async function POST(request: NextRequest) {
             "As solicitações de anúncio para este ponto estão temporariamente suspensas pela administração.",
           bloqueado: true,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -198,7 +206,8 @@ export async function POST(request: NextRequest) {
     });
 
     const maxCotas = ponto.maxCotas || 8;
-    const duracaoDesejada = data.duracaoSegundos || (data.tipoMidia === "VIDEO" ? 15 : 10);
+    const duracaoDesejada =
+      data.duracaoSegundos || (data.tipoMidia === "VIDEO" ? 15 : 10);
 
     // Se atingir o limite de cotas do ponto, entra na FILA_ESPERA
     const vaiParaFilaEspera = cotasOcupadas >= maxCotas;
@@ -265,13 +274,19 @@ export async function POST(request: NextRequest) {
           ? "Cotas da TV preenchidas. Seu anúncio foi adicionado à Fila de Espera com sucesso!"
           : "Anúncio enviado para moderação com sucesso!",
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: error.issues[0]?.message || "Dados inválidos" }, { status: 400 });
+      return Response.json(
+        { error: error.issues[0]?.message || "Dados inválidos" },
+        { status: 400 },
+      );
     }
     console.error("Create anuncio error:", error);
-    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return Response.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 },
+    );
   }
 }

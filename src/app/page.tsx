@@ -1,515 +1,326 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import QRCode from "qrcode";
 import { Header } from "@/components/layout/Header";
 import { Logo } from "@/components/ui/Logo";
+import { Reveal } from "@/components/landing/Reveal";
+import { RotatingWord } from "@/components/landing/RotatingWord";
+import { TvShowcase } from "@/components/landing/TvShowcase";
+import { CountUp } from "@/components/landing/CountUp";
+import { AudienceTabs } from "@/components/landing/AudienceTabs";
+import { TIERS, formatarMoeda } from "@/lib/precificacao";
+
+const LUGARES = [
+  { foto: "gym1", nome: "Academias", tempo: "1–2 h de permanência" },
+  { foto: "dent1", nome: "Clínicas", tempo: "30–60 min de espera" },
+  { foto: "rest1", nome: "Restaurantes", tempo: "30–60 min por refeição" },
+  { foto: "barb2", nome: "Barbearias e salões", tempo: "30–60 min na cadeira" },
+  { foto: "cowork2", nome: "Coworkings", tempo: "mais de 2 h por dia" },
+  { foto: "cafe1", nome: "Cafeterias", tempo: "30–60 min por visita" },
+  { foto: "pet1", nome: "Pet shops", tempo: "30–60 min de espera" },
+  { foto: "hotel1", nome: "Pousadas", tempo: "café da manhã diário" },
+  { foto: "market2", nome: "Supermercados", tempo: "fila do caixa" },
+  { foto: "bake1", nome: "Padarias", tempo: "alto fluxo diário" },
+];
+
+const NUMEROS = [
+  { valor: 8, sufixo: "", rotulo: "marcas no máximo por tela", detalhe: "Sua marca não se perde no meio de dezenas de anúncios." },
+  { valor: 6, sufixo: " min", rotulo: "por ciclo do loop", detalhe: "Seu anúncio volta à tela várias vezes a cada hora." },
+  { valor: 30, sufixo: " dias", rotulo: "de campanha por cota", detalhe: "Tempo para o público lembrar de você." },
+  { valor: 50, sufixo: "%", rotulo: "fica com o estabelecimento", detalhe: "Quem cede a tela participa da receita." },
+];
+
+const PLANOS = [
+  { tier: TIERS.Bronze, descricao: "Telas de bairro com bom movimento e público fiel." },
+  { tier: TIERS.Prata, descricao: "Locais com público qualificado e boa permanência.", destaque: true },
+  { tier: TIERS.Ouro, descricao: "Pontos premium: alto fluxo e longos tempos de espera." },
+];
+
+function Check() {
+  return (
+    <svg className="h-4 w-4 shrink-0 text-[#6F9483]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function Kicker({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm font-medium text-[#4F93C9]">{children}</p>;
+}
 
 export default function HomePage() {
-  const [timeString, setTimeString] = useState("14:30");
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeString(
-        now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const appUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost:3000";
-
-    QRCode.toDataURL(`${appUrl}/cadastro/anunciante`, {
-      width: 140,
-      margin: 1,
-      color: { dark: "#051160", light: "#ffffff" },
-    })
-      .then(setQrCodeUrl)
-      .catch(() => {});
-  }, []);
-
   return (
-    <div className="min-h-screen flex flex-col bg-white text-[#344054] selection:bg-[#4F93C9] selection:text-white font-sans">
+    <div className="min-h-screen flex flex-col bg-white text-[#344054]">
       <Header />
 
-      {/* ── HERO SECTION COM FUNDO CLARO E LOGO EM DESTAQUE ───────────────── */}
-      <section className="relative overflow-hidden pt-8 pb-16 sm:pt-14 sm:pb-24 bg-gradient-to-b from-[#F7F8FA] via-white to-[#F7F8FA]">
-        {/* Glows suaves em tons da marca */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-[#4F93C9]/10 blur-[130px] rounded-full"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/3 -right-48 w-[400px] h-[400px] bg-[#8FAE9E]/15 blur-[100px] rounded-full"
-        />
+      {/* ── HERO ───────────────────────────────────────────── */}
+      {/* -mt compensa a altura do header fixo para o fundo do hero passar por trás dele */}
+      <section className="relative -mt-[68px] overflow-hidden bg-[#F7F8FA]">
+        <div aria-hidden="true" className="absolute inset-0 bg-dot-grid [mask-image:radial-gradient(ellipse_70%_60%_at_50%_30%,black,transparent)]" />
+        <div aria-hidden="true" className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[980px] -translate-x-1/2 rounded-full bg-[#4F93C9]/[0.14] blur-[120px]" />
+        <div aria-hidden="true" className="pointer-events-none absolute top-1/3 -right-40 h-[380px] w-[380px] rounded-full bg-[#8FAE9E]/20 blur-[110px]" />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          {/* Tag de destaque */}
-          <div className="flex justify-center mb-6">
-            <div className="inline-flex items-center gap-2.5 rounded-full border border-[#4F93C9]/30 bg-white px-4 py-1.5 text-xs font-bold text-[#0E1F66] shadow-xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#8FAE9E] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#8FAE9E]" />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-[124px] sm:pt-[148px] pb-20 sm:pb-28">
+          <div className="mx-auto max-w-5xl text-center">
+            <Reveal>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3.5 py-1.5 text-xs font-medium text-[#475467] ring-1 ring-[#0E1F66]/[0.08] backdrop-blur">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#8FAE9E] animate-ping opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#6F9483]" />
+                </span>
+                Mídia indoor para negócios locais
               </span>
-              <span>Rede de Mídia Indoor Inteligente · Ao Vivo</span>
-            </div>
-          </div>
+            </Reveal>
 
-          {/* Título Principal */}
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-6xl lg:text-[72px] font-black tracking-tight text-[#0E1F66] font-heading leading-[1.05]">
-              Sua marca onde as pessoas{" "}
-              <span className="text-brand-gradient">
-                estão.
-              </span>
-            </h1>
+            <Reveal delay={80}>
+              <h1 className="mt-7 font-heading text-[42px] leading-[1.04] sm:text-6xl lg:text-[72px] font-semibold tracking-[-0.035em] text-[#0E1F66]">
+                Sua marca onde
+                <br />
+                <span className="sm:whitespace-nowrap">
+                  as pessoas{" "}
+                  <RotatingWord words={["esperam.", "treinam.", "almoçam.", "se cuidam.", "estão."]} />
+                </span>
+              </h1>
+            </Reveal>
 
-            <p className="mt-6 max-w-2xl mx-auto text-base sm:text-xl text-[#344054] leading-relaxed font-normal">
-              Conectamos comércios com televisores a empresas que desejam anunciar.
-              Uma rede digital direta, com som ativo e sem intermediários.
-            </p>
+            <Reveal delay={160}>
+              <p className="mx-auto mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-[#5B6578]">
+                Anuncie nas TVs de academias, clínicas, restaurantes e barbearias da sua região.
+                Ou transforme a TV do seu estabelecimento em uma nova fonte de renda.
+              </p>
+            </Reveal>
 
-            {/* CTAs com distinção imediata dos 2 fluxos */}
-            <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-xl mx-auto">
-              <Link
-                href="/cadastro/anunciante"
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl text-sm font-extrabold text-white bg-[#4F93C9] hover:bg-[#3D82B5] shadow-lg shadow-[#4F93C9]/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                </svg>
-                <span>Quero Anunciar Meu Negócio</span>
-                <span>→</span>
-              </Link>
-
-              <Link
-                href="/cadastro/ponto"
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl text-sm font-extrabold text-[#0E1F66] bg-white hover:bg-[#F7F8FA] border border-[#E4E7EC] hover:border-[#4F93C9]/50 shadow-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <svg className="w-4 h-4 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span>Tenho TV no Meu Estabelecimento</span>
-                <span className="text-[#4F93C9]">→</span>
-              </Link>
-            </div>
-
-            <div className="mt-4 flex items-center justify-center gap-6 text-[12px] text-[#9AA3AF] font-medium">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" /> Sem mensalidade fixa
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" /> Setup direto na Smart TV
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" /> Transmissão com som ativo
-              </span>
-            </div>
-          </div>
-
-          {/* ── MOLDURA PADRÃO DO PLAYER (TVFRAME OFICIAL MEDIA+) ─────────── */}
-          <div className="mt-14 sm:mt-18 relative max-w-4xl mx-auto">
-            {/* Sombra suave de projeção da tela */}
-            <div
-              aria-hidden="true"
-              className="absolute -inset-4 sm:-inset-6 bg-[#4F93C9]/15 blur-2xl rounded-3xl -z-10"
-            />
-
-            {/* Container da TV com as exatas dimensões e proporção da tela */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-[#081342] bg-[#0E1F66] text-white flex flex-col justify-between aspect-video select-none">
-              
-              {/* Top Bar Oficial da TV (TVFrame) */}
-              <header className="h-12 sm:h-14 px-4 sm:px-8 flex items-center justify-between bg-gradient-to-b from-[#081342] to-transparent z-20">
-                <div className="flex items-center gap-3">
-                  <Logo className="h-5 sm:h-6 w-auto" whiteText={true} />
-                  <span className="h-3.5 w-px bg-white/20" />
-                  <span className="text-xs sm:text-sm font-semibold text-blue-200/90 tracking-wide truncate max-w-[180px] sm:max-w-none">
-                    Ponto de Mídia Parceiro · Florianópolis/SC
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs font-semibold text-white/90">
-                  <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-[#8FAE9E]">
-                    <span className="w-2 h-2 rounded-full bg-[#8FAE9E] animate-pulse" />
-                    Transmissão Ao Vivo
-                  </span>
-                  <span className="text-xs sm:text-sm font-bold font-mono tracking-wider text-blue-100">
-                    {timeString}
-                  </span>
-                </div>
-              </header>
-
-              {/* Área Central Principal (Sem anúncios de terceiros) */}
-              <main className="flex-1 flex items-center justify-center relative overflow-hidden bg-black/40 mx-3 sm:mx-6 rounded-2xl border border-white/10 shadow-inner p-4 text-center">
-                <div className="max-w-md mx-auto space-y-2.5">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#4F93C9]/20 border border-[#4F93C9]/40 text-[#4F93C9] flex items-center justify-center mx-auto shadow-md">
-                    <svg className="w-6 h-6 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-black text-white font-heading tracking-tight">
-                    Canal de Transmissão Media+
-                  </h3>
-                  <p className="text-xs sm:text-sm text-blue-200/80 leading-relaxed">
-                    Espaço reservado para veiculação de anúncios locais em loop sequencial contínuo.
-                  </p>
-                  <div className="pt-1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-bold text-white">
-                    <span>Áudio Habilitado</span>
-                    <span className="text-white/40">•</span>
-                    <span>Loop Automático</span>
-                  </div>
-                </div>
-              </main>
-
-              {/* Barra Inferior Comercial Oficial (TVFrame) */}
-              <footer className="h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between bg-gradient-to-t from-[#081342] via-[#0E1F66]/90 to-transparent z-20">
-                {/* Chamada Comercial */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-[#0E1F66] to-[#4F93C9] text-white flex items-center justify-center font-bold text-base shadow-md shrink-0 border border-white/10">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight font-heading">
-                      Quer ver a sua empresa nesta tela?
-                    </h4>
-                    <p className="text-[10px] sm:text-xs text-blue-200/80 mt-0.5 flex items-center gap-2">
-                      <span>Anuncie para clientes da região</span>
-                      <span className="w-1 h-1 rounded-full bg-[#4F93C9]" />
-                      <span className="font-bold text-[#8FAE9E]">
-                        WhatsApp: (48) 98879-6514
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* QR Code com CTA */}
-                {qrCodeUrl && (
-                  <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-white">
-                        Anuncie Aqui
-                      </p>
-                      <p className="text-[8px] text-blue-200">Aponte a câmera</p>
-                    </div>
-                    <img
-                      src={qrCodeUrl}
-                      alt="QR Code Anuncie Aqui"
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white p-0.5 object-contain"
-                    />
-                  </div>
-                )}
-              </footer>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── SEÇÃO CLARA: DISTINÇÃO DOS DOIS FLUXOS DE USUÁRIO ──────────────── */}
-      <section className="py-20 bg-white border-t border-[#E4E7EC]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs uppercase font-extrabold tracking-widest text-[#4F93C9]">
-              Escolha seu Perfil
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-[#0E1F66] font-heading mt-2">
-              Como funciona para cada usuário
-            </h2>
-            <p className="mt-3 text-sm sm:text-base text-[#344054]">
-              Caminhos independentes e objetivos para anunciantes e donos de estabelecimentos
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* ── FLUXO A: QUEM QUER ANUNCIAR ── */}
-            <div className="rounded-3xl p-8 bg-white border-2 border-[#4F93C9] shadow-xl shadow-[#4F93C9]/5 flex flex-col justify-between hover:border-[#3D82B5] transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <span className="px-3 py-1 rounded-full text-xs font-black bg-[#4F93C9]/10 text-[#0E1F66] border border-[#4F93C9]/30 uppercase tracking-wider">
-                    Perfil 1 · Anunciante
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-[#4F93C9]/10 border border-[#4F93C9]/30 flex items-center justify-center text-[#4F93C9]">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                    </svg>
-                  </div>
-                </div>
-
-                <h3 className="text-2xl sm:text-3xl font-black text-[#0E1F66] font-heading">
-                  Quero Anunciar Meu Negócio
-                </h3>
-                <p className="text-xs sm:text-sm text-[#344054] mt-2 leading-relaxed">
-                  Para empresas, profissionais e marcas que desejam divulgar seus produtos e serviços diretamente para clientes em espera nos estabelecimentos parceiros.
-                </p>
-
-                {/* Passo a Passo do Anunciante */}
-                <div className="mt-6 space-y-3.5">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#0E1F66]">
-                    Como funciona seu fluxo:
-                  </p>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#4F93C9] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      1
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Escolha o Ponto no Mapa</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        Navegue pelas TVs disponíveis por cidade, bairro, categoria e fotos reais do espaço.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#4F93C9] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      2
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Envie sua Peça Promocional</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        Envie seu vídeo (com som) ou imagem. O tempo de veiculação é ajustado automaticamente.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#4F93C9] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      3
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Entrada no Ar na TV</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        Após moderação rápida, seu anúncio passa a rodar na Smart TV escolhida em loop contínuo.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-[#E4E7EC]">
+            <Reveal delay={240}>
+              <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
                   href="/cadastro/anunciante"
-                  className="w-full py-4 rounded-2xl font-extrabold text-sm text-center text-white bg-[#4F93C9] hover:bg-[#3D82B5] shadow-lg shadow-[#4F93C9]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#0E1F66] px-7 py-3.5 text-[15px] font-medium text-white shadow-lg shadow-[#0E1F66]/15 transition hover:bg-[#16297A]"
                 >
-                  <span>Criar Conta de Anunciante</span>
-                  <span>→</span>
+                  Quero anunciar
+                  <span className="transition-transform group-hover:translate-x-0.5">→</span>
                 </Link>
-              </div>
-            </div>
-
-            {/* ── FLUXO B: QUEM TEM TV NO ESTABELECIMENTO ── */}
-            <div className="rounded-3xl p-8 bg-white border-2 border-[#E4E7EC] shadow-xl shadow-slate-900/5 flex flex-col justify-between hover:border-[#0E1F66]/40 transition-all">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <span className="px-3 py-1 rounded-full text-xs font-black bg-[#8FAE9E]/15 text-[#1E4333] border border-[#8FAE9E]/40 uppercase tracking-wider">
-                    Perfil 2 · Dono de TV
-                  </span>
-                  <div className="w-10 h-10 rounded-xl bg-[#8FAE9E]/15 border border-[#8FAE9E]/40 flex items-center justify-center text-[#1E4333]">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                </div>
-
-                <h3 className="text-2xl sm:text-3xl font-black text-[#0E1F66] font-heading">
-                  Tenho TV no Meu Estabelecimento
-                </h3>
-                <p className="text-xs sm:text-sm text-[#344054] mt-2 leading-relaxed">
-                  Para cafés, restaurantes, clínicas, academias e comércios que possuem televisor e desejam integrá-lo à rede de mídia indoor sem precisar de nenhum aparelho.
-                </p>
-
-                {/* Passo a Passo do Dono de TV */}
-                <div className="mt-6 space-y-3.5">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#0E1F66]">
-                    Como funciona seu fluxo:
-                  </p>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#0E1F66] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      1
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Cadastre seu Estabelecimento</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        Informe endereço, horários de funcionamento e adicione fotos do espaço e da TV instalada.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#0E1F66] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      2
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Abra o Player na Smart TV</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        No navegador de internet da TV, acesse o link do player. Não precisa baixar aplicativo.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#F7F8FA] border border-[#E4E7EC]">
-                    <span className="w-6 h-6 rounded-lg bg-[#0E1F66] text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      3
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-[#0E1F66]">Digite o Código de 6 Números</p>
-                      <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                        Basta digitar na TV o código temporário gerado no seu celular e a tela conecta na hora.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-[#E4E7EC] flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/cadastro/ponto"
-                  className="flex-1 py-4 rounded-2xl font-extrabold text-sm text-center text-[#0E1F66] bg-[#F7F8FA] hover:bg-slate-200 border border-[#E4E7EC] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-medium text-[#0E1F66] ring-1 ring-[#0E1F66]/10 shadow-sm transition hover:ring-[#4F93C9]/40"
                 >
-                  <span>Cadastrar Minha TV</span>
-                  <span>→</span>
-                </Link>
-
-                <Link
-                  href="/player"
-                  className="py-4 px-5 rounded-2xl font-bold text-sm text-center text-[#0E1F66] hover:text-[#4F93C9] bg-[#4F93C9]/10 hover:bg-[#4F93C9]/20 border border-[#4F93C9]/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <svg className="w-4 h-4 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <span>Player TV</span>
+                  Tenho uma TV no meu negócio
                 </Link>
               </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={320} className="mt-16 sm:mt-20">
+            <TvShowcase />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── ONDE APARECE ──────────────────────────────────── */}
+      <section id="onde-aparece" className="scroll-mt-20 py-24 sm:py-28 overflow-hidden">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <Reveal className="max-w-2xl">
+            <Kicker>Onde sua marca aparece</Kicker>
+            <h2 className="mt-3 font-heading text-3xl sm:text-[44px] leading-[1.1] font-semibold text-[#0E1F66]">
+              Na sala de espera, ninguém pula o anúncio.
+            </h2>
+            <p className="mt-4 text-[17px] leading-relaxed text-[#5B6578]">
+              As telas ficam em lugares onde o público para e presta atenção — e por bastante tempo.
+            </p>
+          </Reveal>
+        </div>
+
+        <Reveal delay={120} className="mt-14">
+          <div className="relative [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
+            <div className="animate-marquee gap-5 pr-5">
+              {[...LUGARES, ...LUGARES].map((l, i) => (
+                <figure
+                  key={`${l.foto}-${i}`}
+                  aria-hidden={i >= LUGARES.length}
+                  className="group relative h-72 w-56 sm:h-80 sm:w-64 shrink-0 overflow-hidden rounded-3xl bg-[#0E1F66]"
+                >
+                  <img
+                    src={`/uploads/demo/pontos/${l.foto}.webp`}
+                    alt={l.nome}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
+                  />
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0A1240]/85 via-[#0A1240]/30 to-transparent p-5 pt-16 text-white">
+                    <p className="font-heading text-lg font-semibold">{l.nome}</p>
+                    <p className="text-[13px] text-white/75">{l.tempo}</p>
+                  </figcaption>
+                </figure>
+              ))}
             </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ── NÚMEROS ───────────────────────────────────────── */}
+      <section className="border-y border-[#EEF0F3] bg-[#F7F8FA] py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
+            {NUMEROS.map((n, i) => (
+              <Reveal key={n.rotulo} delay={i * 90} className="border-l border-[#DDE1E8] pl-5 sm:pl-6">
+                <p className="font-heading text-4xl sm:text-5xl font-semibold tracking-tight text-[#0E1F66]">
+                  <CountUp value={n.valor} suffix={n.sufixo} />
+                </p>
+                <p className="mt-2 text-sm font-medium text-[#344054]">{n.rotulo}</p>
+                <p className="mt-1 text-[13px] leading-relaxed text-[#8A93A3]">{n.detalhe}</p>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── ATRIBUTOS REAIS DO SISTEMA ─────────────── */}
-      <section className="py-14 bg-[#F7F8FA] border-y border-[#E4E7EC]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="space-y-1">
-              <p className="text-2xl sm:text-3xl font-black font-heading text-[#4F93C9]">Com Som</p>
-              <p className="text-xs font-bold text-[#0E1F66]">Áudio Habilitado</p>
-              <p className="text-[11px] text-[#9AA3AF]">Transmissão sonora contínua nos vídeos</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66]">Sem Aparelhos</p>
-              <p className="text-xs font-bold text-[#0E1F66]">100% no Navegador</p>
-              <p className="text-[11px] text-[#9AA3AF]">Roda direto na sua Smart TV</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-2xl sm:text-3xl font-black font-heading text-[#8FAE9E]">Proof of Play</p>
-              <p className="text-xs font-bold text-[#0E1F66]">Auditoria Real</p>
-              <p className="text-[11px] text-[#9AA3AF]">Contagem exata de exibições</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66]">30 Segundos</p>
-              <p className="text-xs font-bold text-[#0E1F66]">Pareamento Instantâneo</p>
-              <p className="text-[11px] text-[#9AA3AF]">Código rotativo sem complicação</p>
-            </div>
-          </div>
+      {/* ── COMO FUNCIONA ─────────────────────────────────── */}
+      <section id="como-funciona" className="scroll-mt-20 py-24 sm:py-28">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <Kicker>Como funciona</Kicker>
+            <h2 className="mt-3 font-heading text-3xl sm:text-[44px] leading-[1.1] font-semibold text-[#0E1F66]">
+              Simples para quem anuncia. Simples para quem tem a tela.
+            </h2>
+          </Reveal>
+          <Reveal delay={120} className="mt-12">
+            <AudienceTabs />
+          </Reveal>
         </div>
       </section>
 
-      {/* ── BANNER FINAL DE CONVERSÃO ────────────────────────────────────── */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-[#0E1F66] to-[#081342] text-white relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#4F93C9]/20 rounded-full blur-3xl pointer-events-none"
-        />
+      {/* ── PLANOS ────────────────────────────────────────── */}
+      <section id="planos" className="scroll-mt-20 bg-[#F7F8FA] py-24 sm:py-28">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <Kicker>Planos por tela</Kicker>
+            <h2 className="mt-3 font-heading text-3xl sm:text-[44px] leading-[1.1] font-semibold text-[#0E1F66]">
+              Preço justo, definido pelo potencial de cada local.
+            </h2>
+            <p className="mt-4 text-[17px] leading-relaxed text-[#5B6578]">
+              Cada tela recebe uma classificação a partir do fluxo, do tempo de permanência e do perfil do público.
+            </p>
+          </Reveal>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
-          <h2 className="text-3xl sm:text-5xl font-black font-heading tracking-tight">
-            Comece a usar a Media+ hoje mesmo
+          <div className="mt-14 grid gap-5 md:grid-cols-3">
+            {PLANOS.map((p, i) => (
+              <Reveal key={p.tier.tier} delay={i * 100}>
+                <div
+                  className={
+                    p.destaque
+                      ? "relative h-full rounded-3xl bg-[#0E1F66] p-8 text-white shadow-xl"
+                      : "relative h-full rounded-3xl bg-white p-8 ring-1 ring-[#E4E7EC]"
+                  }
+                >
+                  {p.destaque && (
+                    <span className="absolute right-6 top-6 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80">
+                      Mais procurado
+                    </span>
+                  )}
+                  <p className={p.destaque ? "text-sm font-medium text-[#8EC3EA]" : "text-sm font-medium text-[#4F93C9]"}>
+                    {p.tier.tier}
+                  </p>
+                  <p className="mt-4 flex items-baseline gap-1">
+                    <span className={`font-heading text-4xl font-semibold tracking-tight ${p.destaque ? "text-white" : "text-[#0E1F66]"}`}>
+                      {formatarMoeda(p.tier.cotaMensal)}
+                    </span>
+                    <span className={p.destaque ? "text-sm text-white/60" : "text-sm text-[#8A93A3]"}>/mês</span>
+                  </p>
+                  <p className={`mt-4 text-[15px] leading-relaxed ${p.destaque ? "text-white/75" : "text-[#5B6578]"}`}>
+                    {p.descricao}
+                  </p>
+                  <p className={`mt-6 border-t pt-5 text-[13px] ${p.destaque ? "border-white/10 text-white/60" : "border-[#EEF0F3] text-[#8A93A3]"}`}>
+                    Estabelecimento recebe {formatarMoeda(p.tier.repasseAoPonto)} por cota
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={200}>
+            <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-[#475467]">
+              {["Cota mensal por tela", "Sem taxa de adesão", "Relatório de exibições", "Pagamento via PIX"].map((item) => (
+                <li key={item} className="flex items-center gap-2">
+                  <Check />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── CTA FINAL ─────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-[#0B1A57] py-24 sm:py-32 text-white">
+        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_100%,rgba(79,147,201,0.28),transparent_70%)]" />
+        {/* Sinal de transmissão */}
+        <div aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          {[0, 0.8, 1.6].map((d) => (
+            <span
+              key={d}
+              className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.08] animate-signal"
+              style={{ animationDelay: `${d}s` }}
+            />
+          ))}
+        </div>
+
+        <Reveal className="relative mx-auto max-w-3xl px-4 sm:px-6 text-center">
+          <h2 className="font-heading text-3xl sm:text-5xl leading-[1.08] font-semibold tracking-tight">
+            Coloque sua marca na tela certa.
           </h2>
-          <p className="text-sm sm:text-base text-blue-100/90 max-w-xl mx-auto leading-relaxed">
-            Seja para divulgar seu negócio nas telas mais movimentadas da sua região ou para integrar a TV do seu comércio à rede.
+          <p className="mx-auto mt-5 max-w-lg text-[17px] leading-relaxed text-white/70">
+            Escolha os locais, envie seu anúncio e acompanhe cada exibição — tudo em um só painel.
           </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/cadastro/anunciante"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl text-sm font-extrabold text-[#0E1F66] bg-white hover:bg-[#F7F8FA] shadow-xl transition-all cursor-pointer"
+              className="w-full sm:w-auto rounded-full bg-white px-7 py-3.5 text-[15px] font-medium text-[#0E1F66] shadow-lg transition hover:bg-[#EEF4FB]"
             >
-              Criar Conta de Anunciante
+              Começar a anunciar
             </Link>
-
             <Link
               href="/cadastro/ponto"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl text-sm font-extrabold text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-all cursor-pointer"
+              className="w-full sm:w-auto rounded-full px-7 py-3.5 text-[15px] font-medium text-white ring-1 ring-white/25 transition hover:bg-white/10"
             >
-              Cadastrar Minha TV
+              Cadastrar minha TV
             </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
 
-      {/* ── FOOTER CLARO COM LOGO DESTACADA ───────────────────────────────── */}
-      <footer className="border-t border-[#E4E7EC] bg-white pt-14 pb-8 mt-auto text-[#344054]">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
-            <div className="max-w-xs space-y-3">
-              <Link href="/" className="inline-block transition-opacity hover:opacity-80">
-                <Logo className="h-7 w-auto" whiteText={false} />
-              </Link>
-              <p className="text-xs text-[#9AA3AF] leading-relaxed">
-                A plataforma de mídia indoor inteligente que conecta marcas locais ao público certo nos comércios da região.
-              </p>
+      {/* ── RODAPÉ ────────────────────────────────────────── */}
+      <footer className="bg-white">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 sm:px-6 py-14 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-xs">
+            <Logo className="h-7 w-auto" whiteText={false} />
+            <p className="mt-4 text-sm leading-relaxed text-[#8A93A3]">
+              Rede de mídia indoor que conecta marcas locais ao público certo, nas telas dos comércios da região.
+            </p>
+          </div>
+          <div className="flex gap-16 text-sm">
+            <div>
+              <p className="font-medium text-[#0E1F66]">Plataforma</p>
+              <ul className="mt-4 space-y-2.5 text-[#5B6578]">
+                <li><Link href="/login" className="hover:text-[#0E1F66]">Entrar</Link></li>
+                <li><Link href="/cadastro/anunciante" className="hover:text-[#0E1F66]">Anunciar</Link></li>
+                <li><Link href="/cadastro/ponto" className="hover:text-[#0E1F66]">Cadastrar TV</Link></li>
+                <li><Link href="/player" className="hover:text-[#0E1F66]">Player da TV</Link></li>
+              </ul>
             </div>
-
-            <div className="flex flex-wrap gap-12 text-sm">
-              <div className="space-y-3">
-                <p className="font-bold text-[#0E1F66] text-xs tracking-wider uppercase">Plataforma</p>
-                <ul className="space-y-2 text-xs text-[#344054]">
-                  <li><Link href="/login" className="hover:text-[#4F93C9] transition-colors">Acessar Painel</Link></li>
-                  <li><Link href="/cadastro/anunciante" className="hover:text-[#4F93C9] transition-colors">Criar Conta Anunciante</Link></li>
-                  <li><Link href="/cadastro/ponto" className="hover:text-[#4F93C9] transition-colors">Cadastrar Smart TV</Link></li>
-                  <li><Link href="/player" className="hover:text-[#4F93C9] transition-colors">Player da Smart TV</Link></li>
-                </ul>
-              </div>
-
-              <div className="space-y-3">
-                <p className="font-bold text-[#0E1F66] text-xs tracking-wider uppercase">Suporte & Contato</p>
-                <ul className="space-y-2 text-xs text-[#344054]">
-                  <li>
-                    <a
-                      href="https://wa.me/5548988796514"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-[#8FAE9E] transition-colors font-medium flex items-center gap-1.5"
-                    >
-                      <svg className="w-3.5 h-3.5 text-[#8FAE9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span>(48) 98879-6514</span>
-                    </a>
-                  </li>
-                  <li className="text-[11px] text-[#9AA3AF]">Atendimento de Segunda a Sexta</li>
-                </ul>
-              </div>
+            <div>
+              <p className="font-medium text-[#0E1F66]">Contato</p>
+              <ul className="mt-4 space-y-2.5 text-[#5B6578]">
+                <li>
+                  <a href="https://wa.me/5548988796514" target="_blank" rel="noopener noreferrer" className="hover:text-[#0E1F66]">
+                    WhatsApp (48) 98879-6514
+                  </a>
+                </li>
+                <li className="text-[#8A93A3]">Segunda a sexta</li>
+              </ul>
             </div>
           </div>
-
-          <div className="mt-12 pt-6 border-t border-[#E4E7EC] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#9AA3AF]">
-            <p>&copy; {new Date().getFullYear()} Media+. Todos os direitos reservados.</p>
-            <p className="flex items-center gap-1.5 font-semibold text-[#344054]">
-              <span className="h-2 w-2 rounded-full bg-[#8FAE9E] animate-pulse inline-block" />
-              Rede de Transmissão Ativa
-            </p>
+        </div>
+        <div className="border-t border-[#EEF0F3]">
+          <div className="mx-auto flex max-w-6xl flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 py-6 text-xs text-[#8A93A3]">
+            <p>© {new Date().getFullYear()} Media+. Todos os direitos reservados.</p>
+            <p>Sua marca onde as pessoas estão.</p>
           </div>
         </div>
       </footer>

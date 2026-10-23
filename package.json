@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test --test-concurrency=1 tests/**/*.test.ts",
     "db:seed": "tsx src/scripts/seed.ts",
+    "demo:midia": "tsx src/scripts/gerar-midia-demo.ts",
     "security": "bash script.sh",
     "security:quick": "bash script.sh --skip-dast",
     "security:ci": "bash script.sh --require-all"

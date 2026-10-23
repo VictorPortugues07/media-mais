@@ -29,31 +29,31 @@ export function Badge({
   className,
 }: BadgeProps) {
   const variants = {
-    default: "bg-[#F7F8FA] text-[#344054] border-[#E4E7EC]",
-    brand: "bg-[#4F93C9]/10 text-[#0E1F66] border-[#4F93C9]/30 font-semibold",
-    navy: "bg-[#0E1F66]/10 text-[#0E1F66] border-[#0E1F66]/20 font-semibold",
-    teal: "bg-[#8FAE9E]/15 text-[#1E4333] border-[#8FAE9E]/40 font-semibold",
-    coral: "bg-[#F2795C]/15 text-[#9C3218] border-[#F2795C]/40 font-semibold",
-    success: "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold",
-    warning: "bg-amber-50 text-amber-800 border-amber-300 font-semibold",
-    danger: "bg-rose-50 text-rose-700 border-rose-200 font-semibold",
-    info: "bg-[#4F93C9]/10 text-[#0E1F66] border-[#4F93C9]/30 font-semibold",
-    live: "bg-[#D8E8E1] text-[#1E4333] border-[#8FAE9E]/50 font-bold",
-    fila: "bg-[#FEF3C7] text-[#B45309] border-[#FCD34D] font-bold",
-    "tier-ouro": "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D] font-black",
-    "tier-prata": "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1] font-black",
-    "tier-bronze": "bg-[#FFEDD5] text-[#9A3412] border-[#FDBA74] font-black",
+    default: "bg-[#F4F5F7] text-[#475467] border-transparent",
+    brand: "bg-[#4F93C9]/10 text-[#1F5A8A] border-transparent",
+    navy: "bg-[#0E1F66]/[0.07] text-[#0E1F66] border-transparent",
+    teal: "bg-[#8FAE9E]/15 text-[#1E4333] border-transparent",
+    coral: "bg-[#F2795C]/12 text-[#9C3218] border-transparent",
+    success: "bg-emerald-50 text-emerald-700 border-transparent",
+    warning: "bg-amber-50 text-amber-700 border-transparent",
+    danger: "bg-rose-50 text-rose-700 border-transparent",
+    info: "bg-[#4F93C9]/10 text-[#1F5A8A] border-transparent",
+    live: "bg-[#D8E8E1] text-[#1E4333] border-transparent",
+    fila: "bg-[#FEF3C7]/70 text-[#B45309] border-transparent",
+    "tier-ouro": "bg-[#FEF3C7]/70 text-[#92400E] border-[#FCD34D]/60 font-semibold",
+    "tier-prata": "bg-[#F1F5F9] text-[#334155] border-[#CBD5E1]/70 font-semibold",
+    "tier-bronze": "bg-[#FFEDD5]/70 text-[#9A3412] border-[#FDBA74]/60 font-semibold",
   };
 
   const sizes = {
-    sm: "px-2 py-0.5 text-[11px]",
-    md: "px-2.5 py-1 text-xs",
+    sm: "px-2 py-1 text-[11px]",
+    md: "px-2.5 py-1.5 text-xs",
   };
 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border shadow-2xs",
+        "inline-flex items-center gap-1 rounded-full border font-medium leading-none whitespace-nowrap",
         variants[variant],
         sizes[size],
         className

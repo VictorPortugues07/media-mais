@@ -4,12 +4,26 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/utils";
+import {
+  Icon,
+  StatTile,
+  Painel,
+  SecaoTitulo,
+  HeroNavy,
+  PontoVivo,
+  Anel,
+  Toast,
+  PainelCarregando,
+  Saudacao,
+  primeiroNome,
+  moeda,
+  type IconName,
+} from "@/components/dashboard/ui";
 
 interface PontoData {
   id: number;
@@ -57,36 +71,19 @@ interface StatsPonto {
   };
 }
 
-function KpiCard({
-  label,
-  value,
-  sub,
-  icon,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  sub: string;
-  icon: React.ReactNode;
-  color: string;
-}) {
-  return (
-    <Card>
-      <CardBody>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider truncate">
-              {label}
-            </p>
-            <p className={`text-3xl font-black font-heading mt-1.5 ${color}`}>{value}</p>
-            <p className="text-[11px] text-[#9AA3AF] mt-0.5">{sub}</p>
-          </div>
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-[#F7F8FA] ring-1 ring-[#E4E7EC]`}>
-            {icon}
-          </div>
-        </div>
-      </CardBody>
-    </Card>
+const CICLO_CODIGO = 30;
+
+const PASSOS_CONEXAO: { icone: IconName; titulo: string; texto: string }[] = [
+  { icone: "tv", titulo: "Abra o navegador da TV", texto: "Na Smart TV, acesse o endereço do player." },
+  { icone: "qr", titulo: "Ou aponte a câmera", texto: "Use o QR code para abrir o link mais rápido." },
+  { icone: "check", titulo: "Digite o código", texto: "Os 6 números ao lado conectam a tela na hora." },
+];
+
+function Midia({ ad, className }: { ad: AnuncioTV; className?: string }) {
+  return ad.tipoMidia === "VIDEO" ? (
+    <video preload="metadata" src={ad.midiaUrl} muted className={className} />
+  ) : (
+    <img loading="lazy" decoding="async" src={ad.midiaUrl} alt={ad.titulo} className={className} />
   );
 }
 
@@ -100,7 +97,7 @@ export default function PontoDashboard() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [rotativoCode, setRotativoCode] = useState<string>("");
-  const [rotativoSegundos, setRotativoSegundos] = useState<number>(30);
+  const [rotativoSegundos, setRotativoSegundos] = useState<number>(CICLO_CODIGO);
   const [loadingRotativo, setLoadingRotativo] = useState<boolean>(false);
   const [previewAd, setPreviewAd] = useState<AnuncioTV | null>(null);
   const [removalModalOpen, setRemovalModalOpen] = useState(false);
@@ -135,11 +132,10 @@ export default function PontoDashboard() {
       setAdToRequestRemoval(null);
       setMotivoRemocao("");
       setPreviewAd(null);
-      setToastMessage("Solicitação de remoção enviada com sucesso para a moderação!");
+      setToastMessage("Solicitação de remoção enviada para a moderação.");
       setTimeout(() => setToastMessage(null), 4500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao enviar solicitação";
-      setRequestError(msg);
+      setRequestError(err instanceof Error ? err.message : "Erro ao enviar solicitação");
     } finally {
       setRequestingRemoval(false);
     }
@@ -152,7 +148,7 @@ export default function PontoDashboard() {
       if (res.ok) {
         const data = await res.json();
         setRotativoCode(data.codigo);
-        setRotativoSegundos(30);
+        setRotativoSegundos(CICLO_CODIGO);
       }
     } catch (e) {
       console.error("Erro ao gerar código rotativo:", e);
@@ -174,11 +170,10 @@ export default function PontoDashboard() {
         if (anunciosRes.ok) setAnuncios((await anunciosRes.json()).anuncios || []);
         if (statsRes.ok) setStats(await statsRes.json());
 
-        const appUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-        QRCode.toDataURL(`${appUrl}/player`, {
-          width: 250,
+        QRCode.toDataURL(`${window.location.origin}/player`, {
+          width: 280,
           margin: 1,
-          color: { dark: "#051160", light: "#ffffff" },
+          color: { dark: "#0B1A57", light: "#ffffff" },
         }).then(setQrCodeUrl);
 
         fetchRotativoCode();
@@ -193,7 +188,10 @@ export default function PontoDashboard() {
 
     const rotativoTimer = setInterval(() => {
       setRotativoSegundos((prev) => {
-        if (prev <= 1) { fetchRotativoCode(); return 30; }
+        if (prev <= 1) {
+          fetchRotativoCode();
+          return CICLO_CODIGO;
+        }
         return prev - 1;
       });
     }, 1000);
@@ -205,16 +203,19 @@ export default function PontoDashboard() {
       } catch {}
     }, 3000);
 
-    return () => { clearInterval(poll); clearInterval(rotativoTimer); };
+    return () => {
+      clearInterval(poll);
+      clearInterval(rotativoTimer);
+    };
   }, []);
 
   const ponto = user?.pontoMidia;
   const playerUrl = typeof window !== "undefined" ? `${window.location.origin}/player` : "/player";
+  const codigo = rotativoCode || ponto?.codigoTv || "";
 
   const handleCopyCode = () => {
-    const code = rotativoCode || ponto?.codigoTv;
-    if (!code) return;
-    navigator.clipboard.writeText(code);
+    if (!codigo) return;
+    navigator.clipboard.writeText(codigo);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2500);
   };
@@ -225,426 +226,313 @@ export default function PontoDashboard() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
   const isOnline = stats?.tvOnline ?? false;
+  const maxCotas = stats?.maxCotas || 8;
+  const repasse = stats?.financeiro?.repasseMensalEstimado ?? 0;
+  const porMarca = stats?.financeiro?.repassePorAnunciante ?? 0;
+  const exibicoesHoje = stats?.exibicoesPontoHoje ?? 0;
 
   return (
     <DashboardLayout
       role="PONTO"
-      userName={user?.nome || "Dono da TV"}
+      userName={user?.nome || "Estabelecimento"}
       userEmail={user?.email || ""}
       userAvatar={user?.avatarUrl || null}
       pontoId={ponto?.id}
-      title="Painel do Estabelecimento"
+      title="Visão geral"
       description={ponto?.nomeEmpresa || ""}
     >
-      <div className="space-y-6">
-
-        {/* ── Hero de Conexão ─────────────────────────────────────────── */}
-        {ponto && (
-          <div className="rounded-3xl bg-gradient-to-br from-[#0E1F66] via-[#142B85] to-[#29579E] text-white shadow-xl overflow-hidden">
-            <div className="p-6 sm:p-8 flex flex-col lg:flex-row gap-8">
-              {/* Esquerda — Status + instruções */}
-              <div className="flex-1 space-y-4">
+      {loading ? (
+        <PainelCarregando />
+      ) : (
+        <div className="space-y-8">
+          {/* ── Destaque: status da TV + código de conexão ─── */}
+          {ponto && (
+            <HeroNavy>
+              <div className="grid items-center gap-8 p-7 sm:p-9 lg:grid-cols-[1.2fr_1fr]">
                 <div>
-                  {isOnline ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#8FAE9E]/20 text-[#c8e2d6] border border-[#8FAE9E]/40">
-                      <span className="w-2 h-2 rounded-full bg-[#8FAE9E] animate-pulse" />
-                      TV Conectada · Transmitindo Ao Vivo
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#F2795C]/20 text-[#f7a895] border border-[#F2795C]/40">
-                      <span className="w-2 h-2 rounded-full bg-[#F2795C]" />
-                      Aguardando Conexão
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <h2 className="text-2xl sm:text-3xl font-black font-heading tracking-tight">
-                    Conecte sua TV à Rede Media+
-                  </h2>
-                  <p className="text-sm text-blue-100/80 mt-2 leading-relaxed max-w-lg">
-                    Abra <strong className="text-white">{playerUrl}</strong> no navegador da Smart TV e digite o código ao lado.
+                  <p className="text-sm text-white/60">
+                    <Saudacao />, {primeiroNome(user?.nome)}
                   </p>
-                </div>
 
-                <div className="flex items-center gap-2 pt-1">
-                  <code className="bg-black/30 px-3 py-1.5 rounded-xl border border-white/10 text-white font-mono text-xs truncate max-w-xs">
-                    {playerUrl}
-                  </code>
-                  <button
-                    onClick={handleCopyLink}
-                    className="shrink-0 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs transition cursor-pointer"
+                  <span
+                    className={cn(
+                      "mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium",
+                      isOnline ? "bg-[#8FAE9E]/20 text-[#CFE6DB]" : "bg-[#F2795C]/15 text-[#F7B8A6]"
+                    )}
                   >
-                    {copiedLink ? "Copiado" : "Copiar"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Direita — Código rotativo */}
-              <div className="flex flex-col items-center bg-black/30 border border-white/15 p-5 rounded-2xl shrink-0 w-full lg:w-64 backdrop-blur-sm">
-                <div className="flex items-center justify-between w-full mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#8ec3ea]">
-                    Código de Conexão
+                    {isOnline ? <PontoVivo /> : <span className="h-2 w-2 rounded-full bg-[#F2795C]" />}
+                    {isOnline ? "TV conectada · transmitindo agora" : "TV desconectada"}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{rotativoSegundos}s</span>
-                  </span>
-                </div>
 
-                <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden mb-4">
-                  <div
-                    className="bg-[#4F93C9] h-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${(rotativoSegundos / 30) * 100}%` }}
-                  />
-                </div>
+                  <h2 className="mt-4 font-heading text-[28px] sm:text-[34px] font-semibold leading-[1.12] tracking-tight">
+                    {isOnline ? (
+                      <>
+                        Sua tela já exibiu{" "}
+                        <span className="text-[#8EC3EA]">{exibicoesHoje.toLocaleString("pt-BR")} anúncios</span> hoje.
+                      </>
+                    ) : (
+                      "Conecte sua TV para começar a exibir."
+                    )}
+                  </h2>
+                  <p className="mt-3 max-w-md text-[15px] leading-relaxed text-white/65">
+                    {isOnline
+                      ? `${anuncios.length} ${anuncios.length === 1 ? "marca está" : "marcas estão"} no loop da sua TV agora. Você acompanha tudo por aqui.`
+                      : "Abra o player no navegador da Smart TV e digite o código ao lado. Leva menos de um minuto."}
+                  </p>
 
-                <span className="text-5xl font-black font-mono tracking-[0.2em] text-white px-4 py-3 bg-[#081342] rounded-2xl border-2 border-[#4F93C9]/60 shadow-inner">
-                  {loadingRotativo ? "······" : (rotativoCode || ponto.codigoTv || "------")}
-                </span>
-                <p className="text-[10px] text-blue-200/50 mt-2 mb-3 text-center">
-                  Renovado automaticamente a cada 30s
-                </p>
-
-                <div className="flex items-center gap-2 w-full">
-                  <button
-                    onClick={handleCopyCode}
-                    className="flex-1 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {copiedCode ? "Copiado!" : "Copiar"}
-                  </button>
-                  <button
-                    onClick={fetchRotativoCode}
-                    title="Gerar novo código"
-                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs transition flex items-center justify-center cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setQrModalOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-[#4F93C9] hover:bg-[#3D82B5] text-white font-bold text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-sm shadow-[#4F93C9]/25"
-                  >
-                    QR
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── KPIs ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            label="Exibições Hoje"
-            value={stats?.exibicoesPontoHoje ?? 0}
-            sub="veiculações no dia"
-            icon={
-              <svg className="w-5 h-5 text-[#8FAE9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            }
-            color="text-[#0E1F66]"
-          />
-          <KpiCard
-            label="Total Acumulado"
-            value={stats?.totalExibicoesPonto ?? 0}
-            sub="reproduções na TV"
-            icon={
-              <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            color="text-[#0E1F66]"
-          />
-          <KpiCard
-            label="Tempo no Ar"
-            value={`${stats?.horasOnlineEstimadas ?? "0.0"}h`}
-            sub="horas transmitidas"
-            icon={
-              <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            color="text-[#0E1F66]"
-          />
-          <KpiCard
-            label="Anúncios Ativos"
-            value={anuncios.length}
-            sub="campanhas em loop"
-            icon={
-              <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            }
-            color="text-[#0E1F66]"
-          />
-        </div>
-
-        {/* ── Resumo de Faturamento e Repasses ─────────────────────────── */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-[#0E1F66] font-heading">
-                Faturamento & Repasses Estimados
-              </h3>
-              <p className="text-xs text-[#9AA3AF]">
-                Ganhos mensais calculados pelos anunciantes ativos na sua tela
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold text-[#1E4333] bg-[#D8E8E1] border border-[#8FAE9E]/50 px-2.5 py-1 rounded-lg flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8FAE9E]" />
-              Pagamentos mensais garantidos
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="border-l-4 border-l-[#8FAE9E]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Repasse Mensal Estimado
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
-                      {(stats?.financeiro?.repasseMensalEstimado ?? 0).toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      total acumulado no mês atual
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#D8E8E1] text-[#1E4333] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5 text-[#1E4333]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card className="border-l-4 border-l-[#4F93C9]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Ganho por Anunciante
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#4F93C9] mt-1">
-                      + {(stats?.financeiro?.repassePorAnunciante ?? 0).toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      a mais por cada novo anunciante ativo
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#4F93C9]/10 text-[#4F93C9] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5 text-[#4F93C9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card className="border-l-4 border-l-[#0E1F66]">
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#9AA3AF] uppercase tracking-wider">
-                      Ocupação de Cotas
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black font-heading text-[#0E1F66] mt-1">
-                      {anuncios.length} / {stats?.maxCotas || 8}
-                    </p>
-                    <p className="text-[11px] text-[#9AA3AF] mt-0.5">
-                      cotas preenchidas na sua TV
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-[#0E1F66]/10 text-[#0E1F66] flex items-center justify-center font-bold text-lg">
-                    <svg className="w-5 h-5 text-[#0E1F66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-
-          <div className="p-3.5 bg-[#4F93C9]/10 border border-[#4F93C9]/30 rounded-2xl flex items-start gap-3">
-            <svg className="w-5 h-5 text-[#0E1F66] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-xs text-[#0E1F66] leading-relaxed">
-              <strong>Como funciona seu repasse:</strong> Você recebe mensalmente por cada anunciante ativo transmitido na sua TV. Quanto mais cotas preenchidas, maior seu faturamento. Sempre que um novo anunciante entrar, você receberá uma notificação informando o acréscimo de ganho.
-            </p>
-          </div>
-        </div>
-
-        {/* ── Playlist atual ───────────────────────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-[#0E1F66] font-heading">Grade de Transmissão</h3>
-                <p className="text-xs text-[#9AA3AF] mt-0.5">
-                  Anúncios ativos no loop da sua TV ·{" "}
-                  <strong>
-                    {anuncios.length} de {stats?.maxCotas || 8} cotas ocupadas
-                  </strong>
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={anuncios.length > 0 ? "live" : "default"}>
-                  {anuncios.length} no ar ({anuncios.length}/{stats?.maxCotas || 8} cotas)
-                </Badge>
-                <Link href="/ponto/anuncios">
-                  <button className="text-xs font-semibold text-[#4F93C9] hover:text-[#0E1F66] transition px-2 py-1 rounded-lg hover:bg-[#4F93C9]/10 cursor-pointer">
-                    Ver todos →
-                  </button>
-                </Link>
-              </div>
-            </div>
-          </CardHeader>
-          <CardBody className="p-0">
-            {anuncios.length === 0 ? (
-              <div className="p-8">
-                <EmptyState
-                  title="Nenhum anúncio rodando"
-                  description="Quando campanhas forem aprovadas para o seu espaço, elas aparecerão aqui automaticamente."
-                />
-              </div>
-            ) : (
-              <div className="divide-y divide-[#E4E7EC]">
-                {anuncios.map((ad, idx) => (
-                  <div key={ad.id} className="px-5 py-3.5 flex items-center gap-4 hover:bg-[#F7F8FA] transition">
-                    <span className="w-7 h-7 rounded-lg bg-[#8FAE9E]/15 text-[#1E4333] font-black text-xs flex items-center justify-center shrink-0 border border-[#8FAE9E]/30">
-                      {idx + 1}
-                    </span>
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
                     <button
-                      type="button"
-                      onClick={() => setPreviewAd(ad)}
-                      title="Clique para visualizar mídia"
-                      className="w-14 h-10 bg-[#0E1F66] rounded-lg overflow-hidden shrink-0 relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
+                      onClick={handleCopyLink}
+                      className="group inline-flex items-center gap-2.5 rounded-full bg-white/[0.08] py-2 pl-4 pr-2 text-sm text-white/85 ring-1 ring-white/15 transition hover:bg-white/[0.12] cursor-pointer"
                     >
-                      {ad.tipoMidia === "VIDEO" ? (
-                        <video src={ad.midiaUrl} muted className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={ad.midiaUrl} alt={ad.titulo} className="w-full h-full object-cover" />
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </div>
+                      <Icon name="link" className="h-4 w-4 text-[#8EC3EA]" />
+                      <span className="font-mono text-[13px]">{playerUrl.replace(/^https?:\/\//, "")}</span>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#0E1F66]">
+                        {copiedLink ? "Copiado!" : "Copiar"}
+                      </span>
                     </button>
-                    <div className="flex-1 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewAd(ad)}
-                        className="font-semibold text-[#0E1F66] text-sm truncate hover:text-[#4F93C9] transition text-left cursor-pointer"
-                      >
-                        {ad.titulo}
-                      </button>
-                      <p className="text-xs text-[#9AA3AF] truncate">
-                        {ad.anunciante.nomeEmpresa} · {ad.tipoMidia === "VIDEO" ? `${ad.duracaoSegundos}s` : "Imagem"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="live">Ao vivo</Badge>
-                      <button
-                        type="button"
-                        title="Visualizar peça"
-                        onClick={() => setPreviewAd(ad)}
-                        className="p-1.5 rounded-lg text-[#9AA3AF] hover:text-[#4F93C9] hover:bg-[#4F93C9]/10 transition cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        title="Solicitar remoção deste anúncio da sua TV"
-                        onClick={() => handleOpenRemovalModal(ad)}
-                        className="p-1.5 rounded-lg text-[#9AA3AF] hover:text-amber-600 hover:bg-amber-50 transition cursor-pointer"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setQrModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-white ring-1 ring-white/25 transition hover:bg-white/10 cursor-pointer"
+                    >
+                      <Icon name="qr" className="h-4 w-4" />
+                      QR code
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+                </div>
 
-      {/* Modal de Pré-visualização da Peça */}
-      <Modal
-        isOpen={Boolean(previewAd)}
-        onClose={() => setPreviewAd(null)}
-        title={previewAd?.titulo || "Visualização da Transmissão"}
-        description={previewAd ? `Anunciante: ${previewAd.anunciante.nomeEmpresa} · Formato: ${previewAd.tipoMidia} (${previewAd.duracaoSegundos}s)` : ""}
-        size="lg"
-      >
-        {previewAd && (
-          <div className="space-y-4">
-            <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center relative">
-              {previewAd.tipoMidia === "VIDEO" ? (
-                <video
-                  src={previewAd.midiaUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain"
+                {/* Código rotativo */}
+                <div className="rounded-2xl bg-white/[0.06] p-6 ring-1 ring-white/10 backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-medium text-white/85">Código de conexão</p>
+                      <p className="mt-0.5 text-xs text-white/45">Digite na tela do player</p>
+                    </div>
+                    <Anel progresso={rotativoSegundos / CICLO_CODIGO} tamanho={46} espessura={4} cor="#8EC3EA" trilha="rgba(255,255,255,0.12)">
+                      <span className="text-xs font-medium tabular-nums text-white/85">{rotativoSegundos}s</span>
+                    </Anel>
+                  </div>
+
+                  <div key={codigo} className="mt-6 flex justify-between gap-1.5 sm:gap-2">
+                    {(loadingRotativo && !codigo ? "······" : codigo.padEnd(6, "·")).split("").map((d, i) => (
+                      <span
+                        key={i}
+                        className="flex h-14 flex-1 items-center justify-center rounded-xl bg-[#05092A]/60 font-mono text-[26px] font-semibold text-white ring-1 ring-white/10"
+                        style={{ animation: `wordIn 0.45s var(--ease-out-soft) ${i * 55}ms both` }}
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
+                    <button
+                      onClick={handleCopyCode}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-medium text-[#0E1F66] transition hover:bg-[#EEF4FB] cursor-pointer"
+                    >
+                      <Icon name={copiedCode ? "check" : "copy"} className="h-4 w-4" />
+                      {copiedCode ? "Copiado!" : "Copiar código"}
+                    </button>
+                    <button
+                      onClick={fetchRotativoCode}
+                      title="Gerar novo código"
+                      className="inline-flex items-center justify-center rounded-xl px-3 text-white ring-1 ring-white/20 transition hover:bg-white/10 cursor-pointer"
+                    >
+                      <Icon name="refresh" className={cn("h-4 w-4", loadingRotativo && "animate-spin")} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </HeroNavy>
+          )}
+
+          {/* ── Números ──────────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatTile icon="play" tom="sky" label="Exibições hoje" valor={exibicoesHoje} dica="na sua tela" delay={0} />
+            <StatTile icon="chart" tom="teal" label="Exibições no total" valor={stats?.totalExibicoesPonto ?? 0} dica="desde a conexão" delay={70} />
+            <StatTile
+              icon="clock"
+              tom="navy"
+              label="Tempo no ar"
+              valor={Number(stats?.horasOnlineEstimadas ?? 0)}
+              formatar={(v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+              sufixo="h"
+              dica="de anúncios exibidos"
+              delay={140}
+            />
+            <StatTile icon="wallet" tom="amber" label="Repasse do mês" valor={repasse} formatar={moeda} dica="estimado" delay={210} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+            {/* ── Programação da tela ──────────────────────── */}
+            <div className="space-y-5">
+              <SecaoTitulo
+                titulo="Na sua tela agora"
+                descricao={`${anuncios.length} de ${maxCotas} cotas ocupadas · os anúncios giram em sequência`}
+                acao={
+                  <Link
+                    href="/ponto/anuncios"
+                    className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#2F6FA3] transition hover:text-[#0E1F66]"
+                  >
+                    Ver todos
+                    <Icon name="arrow" className="h-4 w-4" />
+                  </Link>
+                }
+              />
+
+              {anuncios.length === 0 ? (
+                <EmptyState
+                  icon={<Icon name="tv" className="h-7 w-7" />}
+                  title="Nenhum anúncio no ar ainda"
+                  description="Quando uma marca for aprovada para a sua tela, ela aparece aqui automaticamente."
                 />
               ) : (
-                <img
-                  src={previewAd.midiaUrl}
-                  alt={previewAd.titulo}
-                  className="w-full h-full object-contain"
-                />
+                <ol className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+                  {anuncios.map((ad, idx) => (
+                    <li
+                      key={ad.id}
+                      className="group overflow-hidden rounded-2xl bg-white ring-1 ring-[#E4E7EC]/80 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:shadow-lg animate-fade-in"
+                      style={{ animationDelay: `${Math.min(idx, 8) * 50}ms` }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAd(ad)}
+                        className="relative block aspect-video w-full overflow-hidden bg-[#0E1F66] cursor-pointer"
+                        title="Ver peça"
+                      >
+                        <Midia ad={ad} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                        <span className="absolute left-3 top-3 flex h-7 min-w-7 items-center justify-center rounded-full bg-white/95 px-2 text-xs font-semibold text-[#0E1F66] shadow-sm">
+                          {idx + 1}º
+                        </span>
+                        {isOnline && (
+                          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md">
+                            <PontoVivo className="h-1.5 w-1.5" />
+                            No loop
+                          </span>
+                        )}
+                        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 text-[11px] font-medium text-white/90">
+                          <Icon name={ad.tipoMidia === "VIDEO" ? "play" : "eye"} className="h-3.5 w-3.5" />
+                          {ad.tipoMidia === "VIDEO" ? "Vídeo" : "Imagem"} · {ad.duracaoSegundos}s
+                        </span>
+                        <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0E1F66] shadow-lg">
+                            <Icon name="eye" className="h-5 w-5" />
+                          </span>
+                        </span>
+                      </button>
+                      <div className="flex items-start justify-between gap-2 p-4">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-[15px] font-semibold text-[#0E1F66]">{ad.anunciante.nomeEmpresa}</h3>
+                          <p className="mt-0.5 truncate text-[13px] text-[#8A93A3]">{ad.titulo}</p>
+                        </div>
+                        <button
+                          type="button"
+                          title="Solicitar remoção da sua TV"
+                          onClick={() => handleOpenRemovalModal(ad)}
+                          className="-mr-1 rounded-lg p-1.5 text-[#AEB6C4] opacity-0 transition hover:bg-amber-50 hover:text-amber-600 group-hover:opacity-100 cursor-pointer"
+                        >
+                          <Icon name="flag" className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            {/* ── Coluna lateral ────────────────────────────── */}
+            <aside className="space-y-5">
+              <Painel className="p-5 animate-fade-in">
+                <p className="text-[13px] font-medium text-[#667085]">Seus ganhos este mês</p>
+                <p className="mt-2 font-heading text-3xl font-semibold tracking-tight text-[#0E1F66]">{moeda(repasse)}</p>
+
+                <div className="mt-5 flex items-center gap-4 border-t border-[#EEF0F3] pt-5">
+                  <Anel progresso={anuncios.length / maxCotas} tamanho={68} espessura={7} cor="#6F9483">
+                    <span className="text-sm font-semibold text-[#0E1F66]">
+                      {anuncios.length}/{maxCotas}
+                    </span>
+                  </Anel>
+                  <div>
+                    <p className="text-[13px] font-medium text-[#344054]">Cotas ocupadas</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[#8A93A3]">
+                      {maxCotas - anuncios.length > 0
+                        ? `Ainda cabem ${maxCotas - anuncios.length} marcas na sua tela.`
+                        : "Sua tela está com todas as cotas ocupadas."}
+                    </p>
+                  </div>
+                </div>
+
+                {porMarca > 0 && (
+                  <div className="mt-5 flex items-center gap-3 rounded-xl bg-[#8FAE9E]/10 p-3.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#8FAE9E]/20 text-[#3E6B57]">
+                      <Icon name="trend" className="h-4 w-4" />
+                    </span>
+                    <p className="text-[13px] leading-snug text-[#1E4333]">
+                      <strong className="font-semibold">+ {moeda(porMarca)}</strong> por mês a cada nova marca na sua tela.
+                    </p>
+                  </div>
+                )}
+              </Painel>
+
+              {!isOnline && (
+                <Painel className="p-5 animate-fade-in" >
+                  <p className="text-[13px] font-medium text-[#667085]">Como conectar a TV</p>
+                  <ol className="mt-4 space-y-4">
+                    {PASSOS_CONEXAO.map((p, i) => (
+                      <li key={p.titulo} className="flex gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#4F93C9]/10 text-[#2F6FA3]">
+                          <Icon name={p.icone} className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-[13px] font-medium text-[#0E1F66]">
+                            {i + 1}. {p.titulo}
+                          </p>
+                          <p className="text-xs text-[#8A93A3]">{p.texto}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </Painel>
+              )}
+            </aside>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de pré-visualização da peça */}
+      <Modal
+        isOpen={Boolean(previewAd)}
+        onClose={() => setPreviewAd(null)}
+        title={previewAd?.titulo || "Anúncio"}
+        description={previewAd ? `${previewAd.anunciante.nomeEmpresa} · ${previewAd.tipoMidia === "VIDEO" ? "Vídeo" : "Imagem"} de ${previewAd.duracaoSegundos}s` : ""}
+        size="lg"
+      >
+        {previewAd && (
+          <div className="space-y-5">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-black">
+              {previewAd.tipoMidia === "VIDEO" ? (
+                <video src={previewAd.midiaUrl} controls autoPlay className="h-full w-full object-contain" />
+              ) : (
+                <img src={previewAd.midiaUrl} alt={previewAd.titulo} className="h-full w-full object-contain" />
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-[#EEF0F3] pt-4">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 onClick={() => {
                   const ad = previewAd;
                   setPreviewAd(null);
                   handleOpenRemovalModal(ad);
                 }}
-                className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200"
+                className="text-amber-700 hover:bg-amber-50 hover:text-amber-800"
               >
-                <svg className="w-4 h-4 mr-1.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Solicitar Remoção à Moderação
+                <Icon name="flag" className="h-4 w-4" />
+                Solicitar remoção
               </Button>
-
-              <Button variant="ghost" size="sm" onClick={() => setPreviewAd(null)}>
+              <Button variant="secondary" size="sm" onClick={() => setPreviewAd(null)}>
                 Fechar
               </Button>
             </div>
@@ -652,102 +540,72 @@ export default function PontoDashboard() {
         )}
       </Modal>
 
-      {/* Modal de Solicitação de Remoção */}
+      {/* Modal de solicitação de remoção */}
       <Modal
         isOpen={removalModalOpen}
         onClose={() => !requestingRemoval && setRemovalModalOpen(false)}
-        title="Solicitar Remoção de Anúncio"
-        description="Envie um pedido à administração para retirar esta campanha da sua TV."
+        title="Retirar anúncio da sua TV"
+        description="A equipe de moderação avalia o pedido e retira a peça da transmissão."
       >
         <div className="space-y-4">
-          {requestError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
-              {requestError}
-            </div>
-          )}
+          {requestError && <div className="rounded-xl bg-rose-50 p-3 text-[13px] text-rose-700">{requestError}</div>}
 
           {adToRequestRemoval && (
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
-              <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
-                {adToRequestRemoval.tipoMidia === "VIDEO" ? (
-                  <video src={adToRequestRemoval.midiaUrl} muted className="w-full h-full object-cover" />
-                ) : (
-                  <img src={adToRequestRemoval.midiaUrl} alt={adToRequestRemoval.titulo} className="w-full h-full object-cover" />
-                )}
+            <div className="flex items-center gap-3.5 rounded-2xl bg-[#F7F8FA] p-3">
+              <div className="h-11 w-16 shrink-0 overflow-hidden rounded-lg bg-[#0E1F66]">
+                <Midia ad={adToRequestRemoval} className="h-full w-full object-cover" />
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-slate-900 text-sm truncate">{adToRequestRemoval.titulo}</p>
-                <p className="text-xs text-slate-500 truncate">
-                  Anunciante: {adToRequestRemoval.anunciante.nomeEmpresa}
-                </p>
+                <p className="truncate text-sm font-semibold text-[#0E1F66]">{adToRequestRemoval.titulo}</p>
+                <p className="truncate text-xs text-[#8A93A3]">{adToRequestRemoval.anunciante.nomeEmpresa}</p>
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Motivo da Solicitação <span className="text-red-500">*</span>
+            <label className="mb-1.5 block text-[13px] font-medium text-[#344054]">
+              Motivo <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={3}
-              className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition"
-              placeholder="Explique o motivo (ex: conteúdo inadequado para o perfil do seu público, marca concorrente direta, imagem com problema...)"
+              className="w-full rounded-xl border border-[#E4E7EC] p-3 text-sm text-[#101828] placeholder:text-[#9AA3AF] outline-none transition focus:border-[#4F93C9] focus:ring-4 focus:ring-[#4F93C9]/15"
+              placeholder="Ex.: não combina com o perfil do seu público, concorrente direto, imagem com problema..."
               value={motivoRemocao}
               onChange={(e) => setMotivoRemocao(e.target.value)}
             />
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed bg-amber-50/70 p-3 rounded-xl border border-amber-200/70 text-amber-900">
-            <strong>Importante:</strong> Como dono da tela, sua solicitação será avaliada pela equipe administrativa. A peça será removida da transmissão assim que aprovada.
-          </p>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 border-t border-[#EEF0F3] pt-4">
             <Button variant="ghost" onClick={() => setRemovalModalOpen(false)} disabled={requestingRemoval}>
               Cancelar
             </Button>
             <Button
-              variant="gradient"
+              variant="navy"
               loading={requestingRemoval}
               disabled={!motivoRemocao.trim() || motivoRemocao.trim().length < 5}
               onClick={handleConfirmRequestRemoval}
             >
-              Enviar Solicitação
+              Enviar solicitação
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-emerald-700 text-white rounded-2xl shadow-xl text-xs font-bold animate-fade-in border border-emerald-500">
-          <svg className="w-4 h-4 text-emerald-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{toastMessage}</span>
-          <button type="button" onClick={() => setToastMessage(null)} className="ml-2 text-emerald-200 hover:text-white cursor-pointer">✕</button>
-        </div>
-      )}
-
-      {/* Modal QR Code */}
-      <Modal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} title="Abrir Player na Smart TV">
-        <div className="flex flex-col items-center text-center gap-4 p-2">
+      {/* Modal QR code */}
+      <Modal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} title="Abrir o player na TV" size="sm">
+        <div className="flex flex-col items-center gap-4 text-center">
           {qrCodeUrl ? (
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-md">
-              <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48 object-contain" />
-            </div>
+            <img src={qrCodeUrl} alt="QR code do player" className="h-52 w-52 rounded-2xl p-2 ring-1 ring-[#E4E7EC]" />
           ) : (
             <Spinner size="lg" />
           )}
-          <p className="text-xs text-slate-500 max-w-xs">
-            Aponte a câmera da TV ou acesse:
-          </p>
-          <code className="px-3 py-1.5 bg-slate-100 rounded-xl text-blue-900 font-mono text-sm font-bold border border-slate-200">
-            {playerUrl}
-          </code>
-          <p className="text-xs text-slate-400">E digite o código de 6 dígitos exibido na tela.</p>
-          <Button variant="secondary" onClick={() => setQrModalOpen(false)}>Fechar</Button>
+          <p className="text-sm text-[#667085]">Aponte a câmera ou acesse</p>
+          <code className="rounded-xl bg-[#F4F5F7] px-3 py-1.5 font-mono text-sm text-[#0E1F66]">{playerUrl}</code>
+          <p className="text-xs text-[#8A93A3]">Depois, digite o código de 6 números que aparece no painel.</p>
         </div>
       </Modal>
+
+      {toastMessage && <Toast mensagem={toastMessage} onClose={() => setToastMessage(null)} />}
     </DashboardLayout>
   );
 }

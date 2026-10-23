@@ -189,9 +189,9 @@ export default function PontoAnunciosPage() {
                       className="w-16 h-11 bg-[#0E1F66] rounded-xl overflow-hidden shrink-0 shadow-xs relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4F93C9]"
                     >
                       {anuncio.tipoMidia === "VIDEO" ? (
-                        <video src={anuncio.midiaUrl} muted className="w-full h-full object-cover" />
+                        <video preload="metadata" src={anuncio.midiaUrl} muted className="w-full h-full object-cover" />
                       ) : (
-                        <img src={anuncio.midiaUrl} alt={anuncio.titulo} className="w-full h-full object-cover" />
+                        <img loading="lazy" decoding="async" src={anuncio.midiaUrl} alt={anuncio.titulo} className="w-full h-full object-cover" />
                       )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,14 +288,14 @@ export default function PontoAnunciosPage() {
           <div className="space-y-4">
             <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-inner flex items-center justify-center relative">
               {previewAd.tipoMidia === "VIDEO" ? (
-                <video
+                <video preload="metadata"
                   src={previewAd.midiaUrl}
                   controls
                   autoPlay
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <img
+                <img loading="lazy" decoding="async"
                   src={previewAd.midiaUrl}
                   alt={previewAd.titulo}
                   className="w-full h-full object-contain"
@@ -367,9 +367,9 @@ export default function PontoAnunciosPage() {
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5">
               <div className="w-14 h-10 bg-slate-900 rounded-lg overflow-hidden shrink-0">
                 {adToRequestRemoval.tipoMidia === "VIDEO" ? (
-                  <video src={adToRequestRemoval.midiaUrl} muted className="w-full h-full object-cover" />
+                  <video preload="metadata" src={adToRequestRemoval.midiaUrl} muted className="w-full h-full object-cover" />
                 ) : (
-                  <img src={adToRequestRemoval.midiaUrl} alt={adToRequestRemoval.titulo} className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={adToRequestRemoval.midiaUrl} alt={adToRequestRemoval.titulo} className="w-full h-full object-cover" />
                 )}
               </div>
               <div className="min-w-0">
